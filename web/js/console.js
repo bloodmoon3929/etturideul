@@ -429,6 +429,29 @@ function consoleScreen() {
     return h('section', { class: 'console-section' }, h('h3', null, `저장 대기 ${ended.length}건`), cards);
   }
 
+  // ── JSON으로 저장되는 데이터 (logger.js의 buildBundle, buildReplay와 맞춰 둔다) ──
+  function dataInfoSection() {
+    const item = (title, text) => h('li', null, h('b', null, title), h('span', null, text));
+    return h('details', { class: 'tools data-info', open: true },
+      h('summary', null, 'JSON으로 저장되는 데이터'),
+      h('div', { class: 'tool-group' },
+        h('p', { class: 'hint' }, '[JSON 저장]을 누르면 세션마다 파일이 폰의 다운로드 폴더에 생깁니다.'),
+        h('h4', null, '<세션 ID>.json'),
+        h('ul', { class: 'info-list' },
+          item('세션 정보', '참여자 번호, 시작·종료 시각, 장소 메모, 동의 항목, 앱·모델·Task 버전, 브라우저 정보(User-Agent), 화면 크기, AI 실행 방식'),
+          item('Task 결과', 'Task별 시작·종료 시각, 완료·건너뜀, 고른 게시물과 정답 여부, 찜한 게시물'),
+          item('행동 기록', '본 화면과 머문 시간, 스크롤, 누른 버튼·게시물(순위·유사도 점수 포함), 입력한 검색어와 결과 상위 20개, 사진 검색에 고른 갤러리 사진, 추천 목록, 뒤로 가기. 모두 발생 시각이 함께 남습니다'),
+          item('마지막 질문', '찾을 때 원래 방식과 사진 검색 중 고른 것'),
+          item('관찰 메모', '연구자가 콘솔에서 적은 메모와 시각')),
+        h('h4', null, '<세션 ID>_replay.json.gz (화면 기록에 동의한 경우만)'),
+        h('ul', { class: 'info-list' },
+          item('화면 기록', '앱 화면이 바뀐 모습, 누른 위치, 스크롤, 입력한 글자. 3D 화면과 카메라 영상은 기록하지 않습니다')),
+        h('h4', null, '수집하지 않는 것'),
+        h('ul', { class: 'info-list' },
+          item('개인 정보', '이름, 연락처, 얼굴, 목소리, 위치'),
+          item('사진', '폰에 있는 실제 사진. 사진 검색은 앱 안의 가상 갤러리 사진만 씁니다'))));
+  }
+
   // ── 도구 (접혀 있음): 오프라인 준비 자세히, 설정, 이미지 출처, M0 측정 ──
   async function toolsSection() {
     const nPhotos = (await photos.all()).length;
@@ -484,6 +507,7 @@ function consoleScreen() {
       h('div', { class: 'tiles' }, modelTile.node, offlineTile.node, pendingTile.node),
       s ? activeSessionCard(s) : await newSessionCard(),
       await pendingSection(ended),
+      dataInfoSection(),
       await toolsSection(),
       h('footer', { class: 'console-foot' }, `v${APP_VERSION} · 데이터 ${db.manifest?.data_version ?? '-'} · 게시물 ${db.posts.length}개`),
     ];

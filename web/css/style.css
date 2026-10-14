@@ -291,6 +291,12 @@ textarea.input { resize: vertical; }
 .check.compact { margin-top: 0; padding: 8px 10px; }
 .link-list { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 a.link-btn { display: inline-flex; align-items: center; text-decoration: none; }
+.info-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.info-list li { display: flex; flex-direction: column; gap: 1px; }
+.info-list b { font-size: 13px; }
+.info-list span { color: var(--sub); line-height: 1.45; }
+.data-info .tool-group { gap: 8px; }
+.data-info h4 { margin-top: 4px; font-family: ui-monospace, monospace; font-size: 12px; }
 .console-foot { text-align: center; font-size: 12px; color: var(--sub); padding: 4px 0 12px; }
 
 .note-list { margin: 0; padding: 0; list-style: none; font-size: 14px; display: flex; flex-direction: column; gap: 8px; }
