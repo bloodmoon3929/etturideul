@@ -30,7 +30,7 @@
 | M5 Task 화면 | Task 3개(원래 방식 검색, 사진 검색, 추천) 구현, 워크스테이션 Chrome에서 동작 확인. 폰 확인 대기 |
 | M6 3D 취향 지도 | 구현했지만 인터뷰에서는 쓰지 않는다(데모에서만 열림) |
 | M7 로그·설문·내보내기 | 앱 쪽 구현(JSON 파일 저장). 분석 스크립트(`analyze_logs.py`)와 대시보드는 아직 |
-| M8 Firebase 배포 | 미구현. 코드에 `TODO(firebase)` 주석만 있다 |
+| M8 배포 | Firebase 대신 GitHub Pages로 배포(https://bloodmoon3929.github.io/etturideul/). 모델은 Hugging Face Hub. 로그 업로드(Firestore)는 미구현, 코드에 `TODO(firebase)` 주석만 있다 |
 | M9 마무리 | 아직 |
 
 아직 만들지 않은 스크립트: `augment_images.py`, `prune_vocab.py`, `evaluate.py`, `make_qr.py`, `analyze_logs.py`, `server_fallback/`(Plan B). 인쇄용 카드(`make_task_cards.py`)는 가상 갤러리를 쓰면서 필요 없어졌다.
@@ -80,6 +80,14 @@ uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requi
 ```
 
 폰에서 열려면 HTTPS 또는 localhost여야 한다(WebGPU, 서비스 워커). `adb reverse tcp:8000 tcp:8000` 후 폰 Chrome에서 `http://localhost:8000`을 연다.
+
+## 배포
+
+- 앱: `main`에 push하면 GitHub Actions(`.github/workflows/pages.yml`)가 `web/`을 GitHub Pages에 올린다. 주소는 https://bloodmoon3929.github.io/etturideul/ 이다. 폰에서 이 주소를 열면 된다(adb 불필요).
+- 외부 라이브러리(`web/vendor/`)는 저장소에 없다. 배포 때와 처음 로컬에서 받을 때 `python3 scripts/fetch_vendor.py`가 버전·SHA-256을 고정한 주소에서 받는다.
+- 모델: Hugging Face Hub의 [bloodmoon3929/etturideul-models](https://huggingface.co/bloodmoon3929/etturideul-models)(q8, fp16). 앱은 `web/js/config.js`의 `MODEL_SOURCE`에 적힌 커밋 해시의 파일만 받는다. 모델을 바꾸면 새로 올리고 그 해시를 고친다. localhost에서 열면 로컬 `models/`를 쓴다.
+- GitHub Pages는 응답 헤더를 지정할 수 없어 교차 출처 격리가 꺼져 있다. 그래서 WASM은 스레드 하나로 돈다(WebGPU 경로는 상관없음).
+- 데이터(`web/data/`, `web/thumbs/`)를 다시 만들었으면 커밋해서 push해야 배포에 반영된다.
 
 ## 앱 사용 흐름
 
