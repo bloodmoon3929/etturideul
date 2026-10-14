@@ -19,7 +19,7 @@
 
 정답 관련 값(`is_target`, `is_correct`, `target_rank`)은 기록 시점에 계산해 넣는다. Task와 무관한 경우 null이다.
 
-- `is_target`: 찾기 Task(T1, T2)에서 게시물의 `product_key`가 Task 대상과 같은지(가장 싼지는 따지지 않음). 추천 Task(T3)에는 정답이 없어 null이다.
+- `is_target`: 찾기 Task(T1~T3)에서 게시물의 `product_key`가 Task 대상과 같은지(가격은 따지지 않음). 구매 추천 Task(T4)에는 대상이 없어 null이다.
 - 세션 묶음의 `session.test`가 true면 [테스트 세션 시작]으로 만든 세션이다. 파일 이름도 `TEST_`로 시작한다. 분석에서는 빼면 된다.
 - `target_rank`: 결과 목록에서 정답 게시물이 처음 나오는 순위(1부터). 없으면 null.
 
@@ -32,8 +32,9 @@
 | `consent`, `task_intro`, `final_survey`, `hand_back` | 동의, 다음 Task 안내([시작] 전), 마지막 질문(UI 선택), 휴대폰 돌려주기 |
 | `pre_survey`, `post_task_survey` | 사전 질문, Task 후 설문 (설문을 켰을 때만) |
 | `a_results`, `a_detail` | T1 원래 방식: 목록·검색 결과, 게시물 상세 |
-| `p_results`, `p_detail` | T2 제안 방식(원래 방식 + 사진 검색): 목록·검색 결과, 게시물 상세 |
-| `r_feed`, `r_detail`, `r_recommend` | T3 구매 추천: 굿즈 목록(찜 n/5, [구매 추천 보기]), 게시물 상세, 구매 추천 페이지 |
+| `p_results`, `p_detail` | T2 원래 방식 + 사진 검색 |
+| `w_results`, `w_detail` | T3 원래 방식 + 가격 확인 안내 |
+| `r_feed`, `r_detail`, `r_recommend` | T4 구매 추천: 굿즈 목록(찜 n/5, [구매 추천 보기]), 게시물 상세, 구매 추천 페이지 |
 | `b_*`, `c_*`, `d_*`, `e_*` | 인터뷰에서는 쓰지 않는 화면(AI 글·사진 검색, 판매 등록, 3D 취향 지도). 코드만 남아 있고 콘솔에서 열 수 없다 |
 
 ## 세션·Task
@@ -53,8 +54,8 @@
 
 참여자가 [건너뛰기]를 누른 경우에도 그때까지 고른 답이 있으면 answer에 남는다.
 
-- T1, T2(가장 싸게 파는 게시물 찾기): `{post_id, same_product, contains_target, price, real_price, cheapest_price, is_correct}`. `price`는 판매가, `real_price`는 그 게시물에서 대상 상품의 실제 가격(본문에서만 가격을 바꾼 게시물, 일괄 판매 게시물은 `data/extra_posts.yaml`의 real_prices), `cheapest_price`는 대상 상품의 가장 낮은 실제 가격이다. `is_correct`는 real_price가 cheapest_price와 같을 때 참이다
-- T3(구매 추천): `{liked, basis, recommended, liked_after, liked_from_recommend}`. basis는 처음 추천을 열었을 때의 찜 목록, recommended는 보여 준 추천, liked_after는 추천을 본 뒤에 찜한 것, liked_from_recommend는 그중 추천 목록에 있던 것이다
+- T1~T3(가장 싸게 살 수 있는 게시물 고르기): `{post_id, product_key, same_product, contains_target, price, real_price, cheapest_price, price_flag}`. 정답·오답은 매기지 않는다(일괄 구매가 마음에 들어 고를 수도 있다). `price`는 판매가, `real_price`는 그 게시물에서 대상 상품의 실제 가격(본문에서만 가격을 바꾼 게시물·일괄 판매 게시물은 `data/extra_posts.yaml`의 real_prices), `cheapest_price`는 참고용 대상 상품의 가장 낮은 실제 가격, `price_flag`는 고른 게시물이 일괄 판매(`bundle`)·가격 불일치(`mismatch`) 게시물이었는지다
+- T4(구매 추천): `{liked, basis, recommended, liked_after, liked_from_recommend}`. basis는 처음 추천을 열었을 때의 찜 목록, recommended는 보여 준 추천, liked_after는 추천을 본 뒤에 찜한 것, liked_from_recommend는 그중 추천 목록에 있던 것이다
 
 Task 정의에 `ask_min_price: true`를 넣으면 찾기 Task가 끝날 때 최저가를 묻고 `price`, `true_min_price`, `price_correct`가 추가된다(지금은 끔).
 
@@ -110,11 +111,12 @@ Task 정의에 `ask_min_price: true`를 넣으면 찾기 Task가 끝날 때 최�
 | `post_view` | 게시물 상세가 열림 | post_id, from_screen, rank, score, tier, section, chain_depth, is_target |
 | `similar_open` | [비슷한 게시물 찾기] | post_id, chain_depth, n_same, n_similar, results, target_rank |
 | `explain_open` | [추천 근거] | post_id, score, tier, from_screen |
-| `recommend_page_open` | T3에서 [구매 추천 보기]로 추천 페이지가 열림 | basis(찜 목록), results(추천: post_id, rank, score(취향 벡터와의 코사인), reason_post_id(가장 비슷한 찜 굿즈)) |
-| `price_warning_open` | [⚠ 가격 확인]을 누름 (제안 방식 화면에만 있음) | post_id, status(`bundle` = 판매가 1원 등 일괄 판매 / `mismatch` = 판매가와 본문 금액이 다름), listed, mentioned(본문 금액), rank, section |
-| `like_add`, `like_remove` | 찜 / 찜 해제 | post_id, is_target, n_likes, from_screen, chain_depth(T3에서 1이면 구매 추천 페이지에서 연 굿즈) |
+| `recommend_page_open` | T4에서 [구매 추천 보기]로 추천 페이지가 열림(첫 n_recommend개) | basis(찜 목록), page(1), results(추천: post_id, rank, score(취향 벡터와의 코사인), reason_post_id(가장 비슷한 찜 굿즈)) |
+| `recommend_more` | [추천 더 보기]로 유사도 다음 순위의 추천을 더 불러옴 | basis, page(2, 3 …), results(위와 같은 형식, rank는 이어서 매김) |
+| `price_warning_open` | [⚠ 가격 확인]을 누름 (T3 화면에만 있음) | post_id, status(`bundle` = 판매가 1원 등 일괄 판매 / `mismatch` = 판매가와 본문 금액이 다름), listed, mentioned(본문 금액), rank, section |
+| `like_add`, `like_remove` | 찜 / 찜 해제 | post_id, is_target, n_likes, from_screen, chain_depth(T4에서 1이면 구매 추천 페이지에서 연 굿즈) |
 
-`section`: `results`(키워드 목록) / `same` / `similar` / `low`(사진 검색 결과의 등급별 구역) / `feed`(T3의 굿즈 목록) / `recommend`(T3 구매 추천 페이지).
+`section`: `results`(키워드 목록) / `same` / `similar` / `low`(사진 검색 결과의 등급별 구역) / `feed`(T4의 굿즈 목록) / `recommend`(T4 구매 추천 페이지).
 `chain_depth`: 목록·검색 결과에서 연 상세는 0, 구매 추천 페이지에서 연 상세는 1이다.
 
 ## 정답
@@ -158,9 +160,9 @@ Task 정의에 `ask_min_price: true`를 넣으면 찾기 Task가 끝날 때 최�
 
 문항 id
 
-지금은 설문을 끄고(`web/js/config.js`의 `SURVEYS`) 세션 끝의 UI 선택 두 문항만 받는다.
+지금은 설문을 모두 끄고(`web/js/config.js`의 `SURVEYS`), 세션 끝의 선택 질문도 묻지 않는다(`protocol.yaml`의 `final_questions: []`). 참여자에게 "앞으로 어느 쪽을 쓰겠냐"고 물으면 듣기 좋은 답을 하기 쉬워서다(The Mom Test).
 
-- 세션 끝(현재 기록되는 것): `pref_find`(찾기: 기존 방식 검색 / AI 검색), `pref_listing`(등록: 기존 방식 등록 / AI 등록). 값은 `classic` / `ai`
+- `final_questions`에 넣으면: `pref_find`(찾기: 원래 방식 / 사진 검색), `pref_listing`(등록: 원래 방식 / AI 등록). 값은 `classic` / `ai`
 - `SURVEYS.pre`를 켜면: `market_freq`, `goods_exp`, `search_method`
 - `SURVEYS.postTask`를 켜면: `SEQ`(1~7), `confidence`(1~5), `comment`
 - `SURVEYS.finalDetail`을 켜면: `umux_classic_1`, `umux_classic_2`, `umux_ai_1`, `umux_ai_2`(1~7), `pref_reason`, `improve`가 추가되고 `pref_*`에 `none`(차이 없음) 선택지가 생긴다

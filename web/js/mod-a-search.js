@@ -1,6 +1,7 @@
 // 모듈 A: 원래 방식 검색 — 중고거래 앱처럼 목록을 내려 보거나 키워드로 검색한다 (카테고리·가격 필터, 정렬).
-// 모듈 P: 제안 방식 — 모듈 A와 똑같은 화면에 [사진] 버튼 하나가 더 있다. 사진으로 같은 상품·비슷한 상품을 찾는다.
-// 두 모듈은 이 파일 하나로 만들어서, 사진 검색 말고는 다른 것이 없게 한다.
+// 모듈 P: 모듈 A와 똑같은 화면에 [사진] 버튼 하나가 더 있다. 사진으로 같은 상품·비슷한 상품을 찾는다.
+// 모듈 W: 모듈 A와 똑같은 화면에 가격 확인 안내만 더한다(판매가와 본문 금액이 다르면 [⚠ 가격 확인]).
+// 세 모듈은 이 파일 하나로 만들어서, 기능 하나씩 말고는 다른 것이 없게 한다.
 // 키워드 검색은 제목·태그 부분 일치만 한다(유사도, 오타 보정, 동의어 없음).
 
 import { CATEGORIES } from './config.js';
@@ -14,9 +15,8 @@ import { chips, postGrid, emptyState, detailScreen, skeletonGrid, tierSections, 
 
 const SORTS = [['latest', '최신순'], ['price', '낮은 가격순']];
 
-function searchScreen({ photoSearch = false } = {}) {
-  const prefix = photoSearch ? 'p' : 'a';
-  const priceCheck = photoSearch;   // 판매가와 본문 금액이 다를 때의 안내는 제안 방식에만 있다
+function searchScreen({ photoSearch = false, priceCheck = false } = {}) {
+  const prefix = photoSearch ? 'p' : priceCheck ? 'w' : 'a';
   const state = { query: '', category: null, minPrice: null, maxPrice: null, sort: 'latest' };
   let searchNo = 0;
   let typing = false;
@@ -189,3 +189,4 @@ function searchScreen({ photoSearch = false } = {}) {
 
 export const rootScreen = () => searchScreen();
 export const photoRootScreen = () => searchScreen({ photoSearch: true });
+export const priceRootScreen = () => searchScreen({ priceCheck: true });

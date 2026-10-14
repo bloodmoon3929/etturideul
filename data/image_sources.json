@@ -14740,5 +14740,40 @@
     "height": 907,
     "sha1": "bff58bd0bc445c4c372c9355af94a10155d2e45c",
     "augmented_from": "img_0100"
+  },
+  {
+    "id": "img_0191_a1",
+    "file": "images/img_0191_a1.jpg",
+    "source": "openverse",
+    "source_id": "86479060-5e50-48ec-ace7-e0f3b00d79e3",
+    "provider": "flickr",
+    "original_url": "https://live.staticflickr.com/5170/5289591954_c2d990503d_b.jpg",
+    "landing_url": "https://www.flickr.com/photos/34366571@N06/5289591954",
+    "title": "RG RX-78-2 Gundam",
+    "creator": "_Chag",
+    "creator_url": "https://www.flickr.com/photos/34366571@N06",
+    "license": "by-nc-sa",
+    "license_name": "CC BY-NC-SA 2.0",
+    "license_url": "https://creativecommons.org/licenses/by-nc-sa/2.0/",
+    "tags": [
+      "bandai",
+      "gundam",
+      "gundam0079",
+      "gunpla",
+      "plamo",
+      "realgrade",
+      "rg",
+      "rx782"
+    ],
+    "query": "gunpla rx-78-2",
+    "category_hint": "프라모델",
+    "series_hint": "건담",
+    "group_hint": "gunpla-rx78",
+    "collected_at": "2026-10-14",
+    "modified": "자르기·회전·밝기·색감 변경(증강)",
+    "width": 605,
+    "height": 807,
+    "sha1": "f8274d94f1197660596703fecc3bd0f6f5c05131",
+    "augmented_from": "img_0191"
   }
 ]

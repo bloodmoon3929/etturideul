@@ -1,8 +1,11 @@
-# Task 1·2("가장 싸게 파는 게시물 찾기")를 위한 게시물. make_dummy.py가 draft_curation.json의 게시물에 더한다.
+# Task 1~3("가장 싸게 살 수 있는 게시물 고르기")를 위한 게시물. make_dummy.py가 draft_curation.json의 게시물에 더한다.
 #
-# - Task 대상 굿즈(세이버 피그마, 리볼텍 단보)는 가격·문구를 다르게 여러 개 올린다.
-#   실제로 가장 싼 게시물은 제목에 상품 이름이 없다("피규어 팝니다", "물건 팝니다").
-# - 판매가와 본문 금액이 다른 게시물(가격을 본문에서만 내림), 판매가 1원짜리 일괄 판매 게시물을 섞는다.
+# Task 대상 굿즈 세 개(세이버 피그마, 리볼텍 단보, RG 건담)는 같은 구조로 여러 개 올린다.
+#   - 제목에 상품 이름이 없는 게시물("피규어 팝니다" 등): 판매가가 낮은 편. 사진 검색이 있어야 찾기 쉽다
+#   - 본문에서만 가격을 내린 게시물: 판매가는 중간인데 본문 가격이 가장 낮다. 가격 확인 안내가 있어야 알아채기 쉽다
+#   - 판매가 1원 일괄 판매: 본문에 상품별 가격이 있다
+#   - 그 밖의 일반 게시물 2~3개
+# 정답·오답은 매기지 않는다. 앱은 고른 게시물과 그 판매가·실제 가격·대상의 최저 실제 가격을 참고로 남긴다.
 # - image: 사진 id. "img_0100_a1"처럼 _aN이 붙은 것은 scripts/augment_images.py가 만든 증강 사진이다(다른 판매자가 찍은 것처럼 보이게).
 # - real_prices: 평가용 실제 가격. 본문 가격이 실제 가격인 게시물과 일괄 판매 게시물에만 적는다(없으면 판매가가 실제 가격).
 # - overrides: draft_curation.json에 있던 게시물의 값을 고친다(사진 id 기준).
@@ -12,7 +15,7 @@ overrides:
 
 posts:
   # ── 세이버 피그마 (Task 1 대상, figma-003-saber-armor) ──────────────
-  # 실제 최저가: img_0060 22,000원 (제목에 이름 없음)
+  # 이름 없는 제목 img_0060 22,000원 / 본문에서만 내림 img_0062 30,000원 → 20,000원 / 일괄 판매 28,000원
   - image: img_0060
     product_key: figma-003-saber-armor
     product_name: figma 003 세이버 갑옷 ver.
@@ -31,9 +34,9 @@ posts:
     series: Fate
     title: 세이버 피규어 가격 내림
     title_style: char_only
-    description: 처음 30,000원에 올렸는데 24,000원으로 내립니다. 검 두 자루 포함이에요.
+    description: 처음 30,000원에 올렸는데 20,000원으로 내립니다. 검 두 자루 포함이에요.
     price: 30000
-    real_prices: {figma-003-saber-armor: 24000}
+    real_prices: {figma-003-saber-armor: 20000}
     condition: 박스 없음
     tags: [세이버, 피규어]
   - image: img_0054
@@ -66,7 +69,7 @@ posts:
     tags: [피그마, 일괄]
 
   # ── 리볼텍 단보 아마존 박스 버전 (Task 2 대상, revoltech-danboard-amazon) ─
-  # 실제 최저가: img_0100_a1 19,000원 (제목에 이름 없음)
+  # 이름 없는 제목 img_0100_a1 19,000원 / 본문에서만 내림 img_0091_a1 27,000원 → 17,000원 / 일괄 판매 24,000원
   - image: img_0100_a1
     product_key: revoltech-danboard-amazon
     product_name: 리볼텍 단보 Amazon.co.jp 박스 ver.
@@ -85,9 +88,9 @@ posts:
     series: 요츠바랑!
     title: 단보 피규어 가격 내렸어요
     title_style: char_only
-    description: 27,000원에 올렸다가 21,000원으로 내렸어요. 관절 헐거움 없습니다.
+    description: 27,000원에 올렸다가 17,000원으로 내렸어요. 관절 헐거움 없습니다.
     price: 27000
-    real_prices: {revoltech-danboard-amazon: 21000}
+    real_prices: {revoltech-danboard-amazon: 17000}
     condition: 사용감 있음
     tags: [단보, 피규어]
   - image: img_0096
@@ -117,6 +120,38 @@ posts:
     real_prices: {revoltech-danboard-amazon: 24000}
     condition: 사용감 있음
     tags: [단보, 일괄]
+
+  # ── RG RX-78-2 건담 (Task 3 대상, rg-rx-78-2-gundam) ─────────────────
+  # 이름 없는 제목 img_0190 19,000원(아래) / 본문에서만 내림 img_0191_a1 24,000원 → 17,000원 / 일괄 판매 21,000원
+  # 그 밖: img_0191 22,000원, img_0199 26,000원 (draft_curation.json). img_0198은 Task 대상 사진이라 게시물에서 빠진다
+  - image: img_0191_a1
+    product_key: rg-rx-78-2-gundam
+    product_name: RG 1/144 RX-78-2 건담
+    category: 프라모델
+    series: 건담
+    title: 퍼스트 건담 RG 가격 내림
+    title_style: abbr
+    description: 24,000원에서 17,000원으로 내립니다. 실드랑 빔 라이플 다 있어요.
+    price: 24000
+    real_prices: {rg-rx-78-2-gundam: 17000}
+    condition: 박스 없음
+    tags: [건프라, RG, 퍼스트건담]
+  - image: img_0257
+    product_key: bundle-gunpla-rx78
+    product_name: 퍼스트 건담 일괄 (RG + HG)
+    category: 프라모델
+    series: 건담
+    title: 건프라 정리합니다 일괄
+    title_style: generic
+    description: |-
+      건프라 정리합니다. 가격은 본문 보시고 연락 주세요.
+      RG 퍼스트 건담 21,000원
+      HG 퍼스트 건담 12,000원
+      둘 다 하시면 30,000원
+    price: 1
+    real_prices: {rg-rx-78-2-gundam: 21000}
+    condition: 박스 없음
+    tags: [건프라, 일괄]
 
   # ── 그 밖의 이름 없는 제목·일괄 판매 ──────────────────────────────────
   - image: img_0354

@@ -13,15 +13,16 @@ import { url } from './config.js';
 const MODULES = {
   A: () => import('./mod-a-search.js'),
   P: () => import('./mod-a-search.js').then((m) => ({ rootScreen: m.photoRootScreen })),
+  W: () => import('./mod-a-search.js').then((m) => ({ rootScreen: m.priceRootScreen })),
   R: () => import('./mod-r-recommend.js'),
   B: () => import('./mod-b-ai-search.js'),
   C: () => import('./mod-c-listing.js'),
   D: () => import('./mod-d-ai-listing.js'),
   E: () => import('./graph.js'),
 };
-// 인터뷰에서 쓰는 화면은 A, P, R이다. 나머지(B~E)는 코드만 남아 있다(콘솔에서 열 수 없음)
+// 인터뷰에서 쓰는 화면은 A, P, W, R이다. 나머지(B~E)는 코드만 남아 있다(콘솔에서 열 수 없음)
 export const MODULE_NAMES = {
-  A: '원래 방식 검색', P: '사진 검색 (제안 방식)', R: '비슷한 굿즈 추천',
+  A: '원래 방식 검색', P: '사진 검색', W: '가격 확인 안내', R: '구매 추천',
   B: 'AI 글·사진 검색', C: '기존 방식 판매 등록', D: 'AI 판매 등록', E: '3D 취향 지도',
 };
 const CONDITION_LABEL = { classic: '원래 방식', ai: '제안 방식' };
@@ -59,15 +60,19 @@ export const task = {
     return i < 0 ? null : i + 1;
   },
 
-  // 가장 싸게 파는 게시물 찾기: 고른 게시물의 실제 가격이 대상 상품의 가장 낮은 실제 가격과 같아야 정답
+  // 가장 싸게 살 수 있는 게시물 고르기: 정답·오답은 매기지 않는다(일괄 구매 할인이 마음에 들어 고를 수도 있다).
+  // 무엇을 골랐는지와 참고용 가격만 남긴다
   cheapestAnswer(post) {
     const key = this.target?.product_key;
     const prices = db.posts.map((p) => realPrice(p, key)).filter((v) => v != null);
-    const cheapest = prices.length ? Math.min(...prices) : null;
-    const real = realPrice(post, key);
     return {
-      post_id: post.id, same_product: post.product_key === key, contains_target: real != null,
-      price: post.price, real_price: real, cheapest_price: cheapest, is_correct: real != null && real === cheapest,
+      post_id: post.id, product_key: post.product_key,
+      same_product: post.product_key === key,          // 대상 상품만 파는 게시물인가
+      contains_target: realPrice(post, key) != null,   // 일괄 판매 등으로 대상 상품이 들어 있는가
+      price: post.price,                                // 판매가
+      real_price: realPrice(post, key),                 // 그 게시물에서 대상 상품의 실제 가격 (참고)
+      cheapest_price: prices.length ? Math.min(...prices) : null,   // 대상 상품의 가장 낮은 실제 가격 (참고)
+      price_flag: post.price_check?.status ?? null,     // 판매가와 본문 금액이 다른 게시물이었는가
     };
   },
 

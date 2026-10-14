@@ -156,7 +156,8 @@ export const latestPosts = () => keywordSearch({});
 
 // ── 구매 추천: 찜한 굿즈들의 통합 벡터 평균(취향 벡터)과 가까운 굿즈 ──────
 // reason: 추천한 굿즈와 가장 비슷한 찜 굿즈 (화면에 "○○와 비슷해요"로 보여 준다)
-export function recommendFromLikes(likedIds, n = 8) {
+// offset: 이미 보여 준 개수. [추천 더 보기]로 다음 순위부터 이어서 불러온다
+export function recommendFromLikes(likedIds, n = 8, offset = 0) {
   const liked = likedIds.map((id) => db.index.get(id)).filter((i) => i != null);
   if (!liked.length) return [];
   const taste = new Float32Array(EMBED_DIM);
@@ -170,7 +171,7 @@ export function recommendFromLikes(likedIds, n = 8) {
     .map((post, i) => ({ post, i, score: dotAt(db.emb.combined, i, taste) }))
     .filter((it) => !likedSet.has(it.post.id))
     .sort((a, b) => b.score - a.score)
-    .slice(0, n)
+    .slice(offset, offset + n)
     .map(({ post, i, score }) => {
       let best = null, bestSim = -2;
       for (const j of liked) {

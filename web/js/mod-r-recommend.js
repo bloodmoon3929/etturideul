@@ -1,6 +1,7 @@
 // 모듈 R: 구매 추천 (Task 3).
 // 1) 목록을 둘러보며 마음에 드는 굿즈를 5개 찜한다(인터뷰어가 시키는 준비 단계)
-// 2) [구매 추천 보기] → 찜 목록을 바탕으로 가장 비슷한 계열의 굿즈를 추천하는 페이지가 열린다(핵심 측정)
+// 2) [구매 추천 보기] → 찜 목록을 바탕으로 가장 비슷한 계열의 굿즈를 추천하는 페이지가 열린다(핵심 측정).
+//    [추천 더 보기]로 유사도 다음 순위의 굿즈를 계속 불러올 수 있다
 //    추천 = 찜한 굿즈들의 통합 벡터 평균(취향 벡터)과 가까운 굿즈. 각 추천에는 가장 비슷한 찜 굿즈를 이유로 붙인다
 // 3) 추천된 굿즈 중 사고 싶은 것을 찜하고 [완료]
 
@@ -16,43 +17,52 @@ const needLikes = () => task.def?.n_likes ?? 5;
 const shorten = (text, n = 12) => (text.length > n ? `${text.slice(0, n)}…` : text);
 
 function openPost(item, ctx) {
-  nav.push(detailScreen(item, { ...ctx, screenId: 'r_detail', priceCheck: true }));
+  nav.push(detailScreen(item, { ...ctx, screenId: 'r_detail' }));
 }
 
-// 구매 추천 페이지
+// 구매 추천 페이지. 처음엔 n_recommend개, [추천 더 보기]를 누를 때마다 유사도 다음 순위부터 같은 수만큼 더 보여 준다
 function recommendScreen() {
   const basis = [...task.likes];
-  const n = task.def?.n_recommend ?? 8;
-  const recs = recommendFromLikes(basis, n);
-  const items = recs.map((r) => ({ post: r.post, note: `♥ '${shorten(r.reason.title)}' 계열` }));   // 가장 비슷한 찜 굿즈
+  const pageSize = task.def?.n_recommend ?? 8;
+  let page = 0;
+  let shown = 0;
   task.extra.basis ??= basis;   // 처음 추천을 본 때의 찜 목록. 그 뒤에 찜한 것이 추천에 대한 반응이다
-  task.extra.recommended = [...new Set([...(task.extra.recommended || []), ...recs.map((r) => r.post.id)])];
-  let shown = false;
   const strip = h('div', { class: 'basis-strip' }, basis.map((id) => {
     const post = db.byId.get(id);
     return h('img', { src: thumbUrl(post), alt: post.title, title: post.title });
   }));
+  const list = h('div', { class: 'recommend-list' });
+  const moreBtn = h('button', { class: 'btn block', type: 'button', onclick: () => loadMore() }, '추천 더 보기');
+
+  function loadMore() {
+    const recs = recommendFromLikes(basis, pageSize, shown);
+    if (!recs.length) {
+      moreBtn.hidden = true;
+      return toast('더 추천할 굿즈가 없어요');
+    }
+    page += 1;
+    const items = recs.map((r) => ({ post: r.post, note: `♥ '${shorten(r.reason.title)}' 계열` }));   // 가장 비슷한 찜 굿즈
+    list.append(postGrid(items, {
+      section: 'recommend', rankOffset: shown,
+      onOpen: (item, pos) => openPost(item, { from: 'r_recommend', ...pos, chain_depth: 1 }),
+    }));
+    task.extra.recommended = [...new Set([...(task.extra.recommended || []), ...recs.map((r) => r.post.id)])];
+    logger.log(page === 1 ? 'recommend_page_open' : 'recommend_more', page === 1 ? null : 'btn_more', {
+      basis, page,
+      results: recs.map((r, i) => ({ post_id: r.post.id, rank: shown + i + 1, score: Number(r.score.toFixed(4)), reason_post_id: r.reason.id })),
+    });
+    shown += recs.length;
+  }
+
   const el = h('div', { class: 'module recommend-page' },
     screenHeader('구매 추천'),
     h('div', { class: 'recommend-head' },
       h('h2', null, '이런 굿즈는 어떠세요?'),
-      h('p', { class: 'hint' }, `찜한 굿즈 ${basis.length}개와 비슷한 계열의 굿즈를 골랐어요.`),
+      h('p', { class: 'hint' }, `찜한 굿즈 ${basis.length}개와 비슷한 계열의 굿즈를 비슷한 순서대로 골랐어요.`),
       strip),
-    postGrid(items, {
-      section: 'recommend', priceCheck: true,
-      onOpen: (item, pos) => openPost(item, { from: 'r_recommend', ...pos, chain_depth: 1 }),
-    }));
-  return {
-    id: 'r_recommend', el,
-    onShow: () => {
-      if (shown) return;
-      shown = true;
-      logger.log('recommend_page_open', null, {
-        basis,
-        results: recs.map((r, i) => ({ post_id: r.post.id, rank: i + 1, score: Number(r.score.toFixed(4)), reason_post_id: r.reason.id })),
-      });
-    },
-  };
+    list, moreBtn);
+  let opened = false;
+  return { id: 'r_recommend', el, onShow: () => { if (!opened) { opened = true; loadMore(); } } };
 }
 
 export function rootScreen() {
@@ -75,7 +85,7 @@ export function rootScreen() {
   const render = () => {
     const items = keywordSearch({ category }).map((post) => ({ post }));
     count.textContent = `${category ?? '전체'} ${items.length}개`;
-    list.replaceChildren(postGrid(items, { section: 'feed', priceCheck: true, onOpen: (item, pos) => openPost(item, { from: 'r_feed', ...pos, chain_depth: 0 }) }));
+    list.replaceChildren(postGrid(items, { section: 'feed', onOpen: (item, pos) => openPost(item, { from: 'r_feed', ...pos, chain_depth: 0 }) }));
     el.scrollTop = 0;
   };
   const categoryChips = chips([[null, '전체'], ...CATEGORIES.map((c) => [c, c])], {

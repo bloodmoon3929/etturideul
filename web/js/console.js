@@ -12,7 +12,7 @@ import { startTask, taskIntroScreen } from './task-frame.js';
 import { consentScreen, preSurveyScreen, postTaskSurveyScreen, finalSurveyScreen, handBackScreen } from './survey.js';
 import { uploadSession, exportSessionJson, exportPhotosZip } from './uploader.js';
 import { startReplay, stopReplay } from './replay.js';
-import { h, formatDuration, onLongPress } from './util.js';
+import { h, won, formatDuration, onLongPress } from './util.js';
 import { toast, confirmDialog, screenHeader, sheet } from './ui.js';
 
 const CONDITION_LABEL = { classic: '원래 방식', ai: '제안 방식' };
@@ -84,13 +84,16 @@ function showConsent(session) {
   }));
 }
 
+// 세션 마지막에 묻는 선택 질문이 있는가 (protocol.yaml의 final_questions)
+const hasFinalQuestions = () => (db.protocol.final_questions ?? ['pref_find']).length > 0;
+
 // 참여자 흐름의 다음 화면으로 보낸다: 남은 Task의 안내 → (모두 끝나면) 마지막 질문 → 휴대폰 돌려주기
 function advance() {
   const s = logger.session;
   const next = s.task_runs.find((r) => r.status === 'pending');
   if (next) {
     nav.reset(taskIntroScreen(next, { onStart: () => startTask(next, { onEnd: afterTask(next) }), onResearcher: showConsole }));
-  } else if (!s.surveys.some((x) => x.scope === 'session')) {
+  } else if (hasFinalQuestions() && !s.surveys.some((x) => x.scope === 'session')) {
     nav.reset(finalSurveyScreen(advance));
   } else {
     nav.reset(handBackScreen('모든 과정이 끝났습니다. 감사합니다!', showConsole));
@@ -347,9 +350,9 @@ function consoleScreen() {
   function activeSessionCard(s) {
     const next = s.task_runs.find((r) => r.status === 'pending');
     const running = s.task_runs.find((r) => r.status === 'running');
-    const finalDone = s.surveys.some((x) => x.scope === 'session');
+    const finalDone = !hasFinalQuestions() || s.surveys.some((x) => x.scope === 'session');
     const beforeConsent = s.step === 'consent' || s.step === 'pre';
-    const continueLabel = running ? `${running.task_id} 다시 시작` : beforeConsent ? '동의 화면부터' : next ? `${next.task_id}부터` : '마지막 질문';
+    const continueLabel = running ? `${running.task_id} 다시 시작` : beforeConsent ? '동의 화면부터' : next ? `${next.task_id}부터` : hasFinalQuestions() ? '마지막 질문' : '마무리';
     const finished = s.task_runs.filter((r) => r.status !== 'pending' && r.status !== 'running').length;
     const steps = s.task_runs.map((r) => {
       const def = db.protocol.tasks[r.task_id];
@@ -359,9 +362,10 @@ function consoleScreen() {
         h('div', { class: 'step-body' },
           h('div', { class: 'step-title' }, `${r.task_id} ${def?.name ?? ''}`),
           h('div', { class: 'step-meta' },
-            CONDITION_LABEL[r.condition] ? h('span', { class: `cond-chip ${r.condition}` }, CONDITION_LABEL[r.condition]) : null,
+            r.condition ? h('span', { class: `cond-chip ${r.condition}` }, def?.condition_label ?? CONDITION_LABEL[r.condition]) : null,
             ` ${STATUS_LABEL[r.status]}`,
             correct === true ? h('span', { class: 'badge ok' }, '정답') : correct === false ? h('span', { class: 'badge no' }, '오답') : null,
+            r.answer?.price != null ? h('span', { class: 'badge' }, `고름 ${won(r.answer.price)}${r.answer.price_flag === 'bundle' ? ' 일괄' : ''}`) : null,
             r.answer?.liked ? h('span', { class: 'badge' }, `찜 ${r.answer.liked.length}`) : null)),
         r === next && !running ? h('button', { class: 'link-btn small', type: 'button', onclick: async () => {
           if (await confirmDialog(`${r.task_id}을(를) 건너뛸까요?`, { ok: '건너뛰기' })) { await logger.skipRun(r); render(); }
@@ -376,7 +380,7 @@ function consoleScreen() {
       h('ol', { class: 'steps' }, steps),
       !finalDone || running
         ? h('button', { class: 'btn primary big block', type: 'button', onclick: continueSession }, `이어서 진행 · ${continueLabel}`)
-        : h('p', { class: 'done-note' }, '✓ 모든 Task와 마지막 질문이 끝났습니다. 세션을 종료하고 저장해 주세요.'),
+        : h('p', { class: 'done-note' }, '✓ 모든 Task가 끝났습니다. 세션을 종료하고 저장해 주세요.'),
       h('div', { class: 'row' },
         h('button', { class: 'btn', type: 'button', onclick: () => openNotes(s) }, `관찰 메모${s.notes.length ? ` ${s.notes.length}` : ''}`),
         h('button', { class: 'btn danger', type: 'button', onclick: () => endSession(render) }, '세션 종료')));
@@ -447,9 +451,9 @@ function consoleScreen() {
         h('h4', null, '<세션 ID>.json'),
         h('ul', { class: 'info-list' },
           item('세션 정보', '참여자 번호, 테스트 세션 여부, 시작·종료 시각, 장소 메모, 동의 항목, 앱·모델·Task 버전, 브라우저 정보(User-Agent), 화면 크기, AI 실행 방식'),
-          item('Task 결과', 'Task별 시작·종료 시각, 완료·건너뜀, 고른 게시물과 그 실제 가격·가장 싼 게시물이었는지, 찜한 굿즈(추천을 보기 전과 후), 추천받은 굿즈'),
-          item('행동 기록', '본 화면과 머문 시간, 스크롤, 누른 버튼·게시물(순위·유사도 점수 포함), 입력한 검색어와 결과 상위 20개, 사진 검색에 고른 갤러리 사진, 가격 확인 안내를 연 것, 구매 추천 목록, 뒤로 가기. 모두 발생 시각이 함께 남습니다'),
-          item('마지막 질문', '찾을 때 원래 방식과 사진 검색 중 고른 것'),
+          item('Task 결과', 'Task별 시작·종료 시각, 완료·건너뜀, 고른 게시물(판매가, 그 게시물에서 대상 굿즈의 실제 가격, 일괄 판매·가격 불일치 게시물이었는지, 참고용 최저 실제 가격), 찜한 굿즈(추천을 보기 전과 후), 추천받은 굿즈. 정답·오답은 매기지 않습니다'),
+          item('행동 기록', '본 화면과 머문 시간, 스크롤, 누른 버튼·게시물(순위·유사도 점수 포함), 입력한 검색어와 결과 상위 20개, 사진 검색에 고른 갤러리 사진, 가격 확인 안내를 연 것, 구매 추천 목록과 [추천 더 보기], 뒤로 가기. 모두 발생 시각이 함께 남습니다'),
+          hasFinalQuestions() ? item('마지막 질문', '찾을 때 원래 방식과 사진 검색 중 고른 것') : null,
           item('관찰 메모', '연구자가 콘솔에서 적은 메모와 시각')),
         h('h4', null, '<세션 ID>_replay.json.gz (화면 기록에 동의한 경우만)'),
         h('ul', { class: 'info-list' },
