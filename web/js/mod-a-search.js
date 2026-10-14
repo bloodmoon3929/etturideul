@@ -16,6 +16,7 @@ const SORTS = [['latest', '최신순'], ['price', '낮은 가격순']];
 
 function searchScreen({ photoSearch = false } = {}) {
   const prefix = photoSearch ? 'p' : 'a';
+  const priceCheck = photoSearch;   // 판매가와 본문 금액이 다를 때의 안내는 제안 방식에만 있다
   const state = { query: '', category: null, minPrice: null, maxPrice: null, sort: 'latest' };
   let searchNo = 0;
   let typing = false;
@@ -93,7 +94,7 @@ function searchScreen({ photoSearch = false } = {}) {
   const list = h('div', { class: 'results' });
 
   const openDetail = (item, { rank, section }) => {
-    nav.push(detailScreen(item, { screenId: `${prefix}_detail`, from: `${prefix}_results`, rank, section, chain_depth: 0 }));
+    nav.push(detailScreen(item, { screenId: `${prefix}_detail`, from: `${prefix}_results`, rank, section, chain_depth: 0, priceCheck }));
   };
 
   // 키워드 목록. trigger: submit(검색 버튼) / category / filter / sort / initial(처음 화면, 기록하지 않음)
@@ -102,7 +103,7 @@ function searchScreen({ photoSearch = false } = {}) {
     const items = keywordSearch(state).map((post) => ({ post }));
     const latency = Math.round(performance.now() - t0);
     count.textContent = state.query ? `'${state.query}' 검색 결과 ${items.length}개` : `전체 ${items.length}개`;
-    list.replaceChildren(items.length ? postGrid(items, { section: 'results', onOpen: openDetail }) : emptyState('검색 결과가 없습니다'));
+    list.replaceChildren(items.length ? postGrid(items, { section: 'results', onOpen: openDetail, priceCheck }) : emptyState('검색 결과가 없습니다'));
     el.scrollTop = 0;
     if (trigger === 'initial') return;
     logger.log('search_submit', trigger === 'submit' ? 'search_box' : trigger, {
@@ -161,7 +162,7 @@ function searchScreen({ photoSearch = false } = {}) {
     try {
       const out = await aiPhotoSearch(photo.file);
       logger.log('photo_pick', 'btn_camera', { source: photo.source, retake_no: retakeNo, width: out.width, height: out.height, embed_ms: out.embed_ms, ...photo.meta });
-      const { same, similar } = tierSections(list, out.results, { onOpen: openDetail });
+      const { same, similar } = tierSections(list, out.results, { onOpen: openDetail, priceCheck });
       count.textContent = `같은 상품 ${same.length}개 · 비슷한 상품 ${similar.length}개`;
       el.scrollTop = 0;
       logger.log('search_submit', 'btn_camera', {

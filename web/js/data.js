@@ -110,9 +110,22 @@ export function similarPosts(postId) {
   });
 }
 
+// 평가용 실제 가격: 본문에서만 가격을 바꾼 게시물·일괄 판매 게시물은 real_prices에 적혀 있다
+export function realPrice(post, productKey) {
+  return post.real_prices?.[productKey] ?? (post.product_key === productKey ? post.price : null);
+}
+
+// 시세 요약에 쓰는 가격. 일괄 판매(판매가 1원 등)는 빼고, 본문 가격이 다르면 본문의 낮은 가격을 쓴다
+export function statsPrice(post) {
+  const check = post.price_check;
+  if (check?.status === 'bundle') return null;
+  if (check?.status === 'mismatch') return Math.min(post.price, ...check.mentioned.map((m) => m.price));
+  return post.price;
+}
+
 export function priceStats(posts) {
-  if (!posts.length) return null;
-  const prices = posts.map((p) => p.price).sort((a, b) => a - b);
+  const prices = posts.map(statsPrice).filter((v) => v != null).sort((a, b) => a - b);
+  if (!prices.length) return null;
   const mid = Math.floor(prices.length / 2);
   return {
     n: prices.length, min: prices[0], max: prices[prices.length - 1],
@@ -140,6 +153,34 @@ export function keywordSearch({ query = '', category = null, minPrice = null, ma
 }
 
 export const latestPosts = () => keywordSearch({});
+
+// ── 구매 추천: 찜한 굿즈들의 통합 벡터 평균(취향 벡터)과 가까운 굿즈 ──────
+// reason: 추천한 굿즈와 가장 비슷한 찜 굿즈 (화면에 "○○와 비슷해요"로 보여 준다)
+export function recommendFromLikes(likedIds, n = 8) {
+  const liked = likedIds.map((id) => db.index.get(id)).filter((i) => i != null);
+  if (!liked.length) return [];
+  const taste = new Float32Array(EMBED_DIM);
+  for (const i of liked) for (let k = 0; k < EMBED_DIM; k++) taste[k] += db.emb.combined[i * EMBED_DIM + k];
+  let norm = 0;
+  for (let k = 0; k < EMBED_DIM; k++) norm += taste[k] * taste[k];
+  norm = Math.sqrt(norm) || 1;
+  for (let k = 0; k < EMBED_DIM; k++) taste[k] /= norm;
+  const likedSet = new Set(likedIds);
+  return db.posts
+    .map((post, i) => ({ post, i, score: dotAt(db.emb.combined, i, taste) }))
+    .filter((it) => !likedSet.has(it.post.id))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, n)
+    .map(({ post, i, score }) => {
+      let best = null, bestSim = -2;
+      for (const j of liked) {
+        let sim = 0;
+        for (let k = 0; k < EMBED_DIM; k++) sim += db.emb.combined[i * EMBED_DIM + k] * db.emb.combined[j * EMBED_DIM + k];
+        if (sim > bestSim) { bestSim = sim; best = db.posts[j]; }
+      }
+      return { post, score, reason: best };
+    });
+}
 
 // ── AI 검색 (PLAN 5.2) ────────────────────────────────────────────────
 // settings.searchBackend 하나로 임베딩 계산 위치가 바뀐다 (PLAN 6.4).

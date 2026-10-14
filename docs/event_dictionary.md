@@ -19,7 +19,8 @@
 
 정답 관련 값(`is_target`, `is_correct`, `target_rank`)은 기록 시점에 계산해 넣는다. Task와 무관한 경우 null이다.
 
-- `is_target`: 찾기 Task(T1, T2)에서 게시물의 `product_key`가 Task 대상과 같은지. 추천 Task(T3)에는 정답이 없어 null이다.
+- `is_target`: 찾기 Task(T1, T2)에서 게시물의 `product_key`가 Task 대상과 같은지(가장 싼지는 따지지 않음). 추천 Task(T3)에는 정답이 없어 null이다.
+- 세션 묶음의 `session.test`가 true면 [테스트 세션 시작]으로 만든 세션이다. 파일 이름도 `TEST_`로 시작한다. 분석에서는 빼면 된다.
 - `target_rank`: 결과 목록에서 정답 게시물이 처음 나오는 순위(1부터). 없으면 null.
 
 ## 화면 id
@@ -32,14 +33,14 @@
 | `pre_survey`, `post_task_survey` | 사전 질문, Task 후 설문 (설문을 켰을 때만) |
 | `a_results`, `a_detail` | T1 원래 방식: 목록·검색 결과, 게시물 상세 |
 | `p_results`, `p_detail` | T2 제안 방식(원래 방식 + 사진 검색): 목록·검색 결과, 게시물 상세 |
-| `r_feed`, `r_detail` | T3 추천: 굿즈 목록, 게시물 상세(아래에 비슷한 굿즈 추천) |
+| `r_feed`, `r_detail`, `r_recommend` | T3 구매 추천: 굿즈 목록(찜 n/5, [구매 추천 보기]), 게시물 상세, 구매 추천 페이지 |
 | `b_*`, `c_*`, `d_*`, `e_*` | 인터뷰에서는 쓰지 않는 화면(AI 글·사진 검색, 판매 등록, 3D 취향 지도). 코드만 남아 있고 콘솔에서 열 수 없다 |
 
 ## 세션·Task
 
 | event | 언제 | data |
 |---|---|---|
-| `session_start` | 연구자가 [세션 시작] | participant, order_group(순서가 고정이라 지금은 null), location_note |
+| `session_start` | 연구자가 [세션 시작] 또는 [테스트 세션 시작] | participant(테스트는 T01…), order_group(순서가 고정이라 지금은 null), location_note |
 | `consent` | 동의 화면 제출 | behavior, replay, photos |
 | `task_intro` | 다음 Task 안내 화면이 보임 | task_run_id, task_id, condition, order_index. 이 이벤트에서 `task_start`까지가 안내문을 읽은 시간이다 |
 | `task_start` | 참여자가 안내 화면의 [시작]을 누름. Task 시간은 여기서부터 잰다 | task_id, condition, order_index, target_id |
@@ -52,8 +53,8 @@
 
 참여자가 [건너뛰기]를 누른 경우에도 그때까지 고른 답이 있으면 answer에 남는다.
 
-- T1, T2(찾기): `{post_id, is_correct}`
-- T3(추천): `{liked: [post_id…]}`
+- T1, T2(가장 싸게 파는 게시물 찾기): `{post_id, same_product, contains_target, price, real_price, cheapest_price, is_correct}`. `price`는 판매가, `real_price`는 그 게시물에서 대상 상품의 실제 가격(본문에서만 가격을 바꾼 게시물, 일괄 판매 게시물은 `data/extra_posts.yaml`의 real_prices), `cheapest_price`는 대상 상품의 가장 낮은 실제 가격이다. `is_correct`는 real_price가 cheapest_price와 같을 때 참이다
+- T3(구매 추천): `{liked, basis, recommended, liked_after, liked_from_recommend}`. basis는 처음 추천을 열었을 때의 찜 목록, recommended는 보여 준 추천, liked_after는 추천을 본 뒤에 찜한 것, liked_from_recommend는 그중 추천 목록에 있던 것이다
 
 Task 정의에 `ask_min_price: true`를 넣으면 찾기 Task가 끝날 때 최저가를 묻고 `price`, `true_min_price`, `price_correct`가 추가된다(지금은 끔).
 
@@ -104,22 +105,23 @@ Task 정의에 `ask_min_price: true`를 넣으면 찾기 Task가 끝날 때 최�
 
 | event | 언제 | data |
 |---|---|---|
-| `result_impression` | 결과 카드가 절반 이상 화면에 보임(카드당 한 번) | post_id, rank, score, tier, section, is_target |
+| `result_impression` | 결과 카드가 절반 이상 화면에 보임(카드당 한 번) | post_id, rank, score, tier, section, is_target, price_flag(카드에 가격 확인 안내가 붙었으면 그 종류) |
 | `result_click` | 결과 카드를 누름 | post_id, rank, score, tier, section, is_target |
 | `post_view` | 게시물 상세가 열림 | post_id, from_screen, rank, score, tier, section, chain_depth, is_target |
 | `similar_open` | [비슷한 게시물 찾기] | post_id, chain_depth, n_same, n_similar, results, target_rank |
 | `explain_open` | [추천 근거] | post_id, score, tier, from_screen |
-| `recommend_shown` | T3에서 굿즈를 골라 상세가 열리고 그 아래에 추천이 보임 | post_id(고른 굿즈), chain_depth, results(추천한 굿즈: post_id, rank, score, tier) |
-| `like_add`, `like_remove` | 찜 / 찜 해제 | post_id, is_target, n_likes, from_screen, chain_depth(T3에서 1 이상이면 추천을 따라 들어간 굿즈) |
+| `recommend_page_open` | T3에서 [구매 추천 보기]로 추천 페이지가 열림 | basis(찜 목록), results(추천: post_id, rank, score(취향 벡터와의 코사인), reason_post_id(가장 비슷한 찜 굿즈)) |
+| `price_warning_open` | [⚠ 가격 확인]을 누름 (제안 방식 화면에만 있음) | post_id, status(`bundle` = 판매가 1원 등 일괄 판매 / `mismatch` = 판매가와 본문 금액이 다름), listed, mentioned(본문 금액), rank, section |
+| `like_add`, `like_remove` | 찜 / 찜 해제 | post_id, is_target, n_likes, from_screen, chain_depth(T3에서 1이면 구매 추천 페이지에서 연 굿즈) |
 
-`section`: `results`(키워드 목록) / `same` / `similar` / `low`(사진 검색 결과의 등급별 구역) / `feed`(T3의 굿즈 목록) / `recommend`(T3의 추천 굿즈).
-`chain_depth`: 목록·검색 결과에서 연 상세는 0, 추천된 굿즈를 따라 들어갈 때마다 1씩 늘어난다.
+`section`: `results`(키워드 목록) / `same` / `similar` / `low`(사진 검색 결과의 등급별 구역) / `feed`(T3의 굿즈 목록) / `recommend`(T3 구매 추천 페이지).
+`chain_depth`: 목록·검색 결과에서 연 상세는 0, 구매 추천 페이지에서 연 상세는 1이다.
 
 ## 정답
 
 | event | 언제 | data |
 |---|---|---|
-| `answer_submit` | [이 상품이에요] | post_id, is_correct, from_screen, rank |
+| `answer_submit` | [이걸로 살래요] | 위 T1·T2 answer의 필드, from_screen, rank |
 | `price_answer` | 최저가 답변 | price, true_min_price, price_correct |
 
 ## 등록

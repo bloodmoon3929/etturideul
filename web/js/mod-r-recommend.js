@@ -1,38 +1,81 @@
-// 모듈 R: 비슷한 굿즈 추천.
-// 목록에서 마음에 드는 굿즈를 고르면(게시물을 열면) 그 굿즈와 비슷한 굿즈를 게시물 아래에 추천한다.
-// 추천은 미리 계산한 similar.json의 상위 N개다(모델 불필요). 추천된 굿즈를 열면 다시 그 굿즈 기준으로 추천한다.
+// 모듈 R: 구매 추천 (Task 3).
+// 1) 목록을 둘러보며 마음에 드는 굿즈를 5개 찜한다(인터뷰어가 시키는 준비 단계)
+// 2) [구매 추천 보기] → 찜 목록을 바탕으로 가장 비슷한 계열의 굿즈를 추천하는 페이지가 열린다(핵심 측정)
+//    추천 = 찜한 굿즈들의 통합 벡터 평균(취향 벡터)과 가까운 굿즈. 각 추천에는 가장 비슷한 찜 굿즈를 이유로 붙인다
+// 3) 추천된 굿즈 중 사고 싶은 것을 찜하고 [완료]
 
 import { CATEGORIES } from './config.js';
-import { keywordSearch, similarPosts } from './data.js';
+import { db, keywordSearch, recommendFromLikes, thumbUrl } from './data.js';
 import { logger } from './logger.js';
 import { nav } from './nav.js';
+import { task } from './task-frame.js';
 import { h } from './util.js';
-import { chips, postGrid, detailScreen, resultRows } from './ui.js';
+import { chips, postGrid, detailScreen, screenHeader, toast } from './ui.js';
 
-const N_RECOMMEND = 6;
+const needLikes = () => task.def?.n_likes ?? 5;
+const shorten = (text, n = 12) => (text.length > n ? `${text.slice(0, n)}…` : text);
 
-// chain_depth: 목록에서 직접 고른 굿즈는 0, 추천을 따라 들어갈 때마다 1씩 늘어난다
 function openPost(item, ctx) {
-  const depth = ctx.chain_depth ?? 0;
-  const items = similarPosts(item.post.id).slice(0, N_RECOMMEND);
-  nav.push(detailScreen(item, {
-    ...ctx, screenId: 'r_detail',
-    below: () => [
-      h('h3', { class: 'section-title' }, '이 굿즈와 비슷한 굿즈'),
-      postGrid(items, { section: 'recommend', onOpen: (it, pos) => openPost(it, { from: 'r_detail', ...pos, chain_depth: depth + 1 }) }),
-    ],
-    onView: () => logger.log('recommend_shown', null, { post_id: item.post.id, chain_depth: depth, results: resultRows(items) }),
+  nav.push(detailScreen(item, { ...ctx, screenId: 'r_detail', priceCheck: true }));
+}
+
+// 구매 추천 페이지
+function recommendScreen() {
+  const basis = [...task.likes];
+  const n = task.def?.n_recommend ?? 8;
+  const recs = recommendFromLikes(basis, n);
+  const items = recs.map((r) => ({ post: r.post, note: `♥ '${shorten(r.reason.title)}' 계열` }));   // 가장 비슷한 찜 굿즈
+  task.extra.basis ??= basis;   // 처음 추천을 본 때의 찜 목록. 그 뒤에 찜한 것이 추천에 대한 반응이다
+  task.extra.recommended = [...new Set([...(task.extra.recommended || []), ...recs.map((r) => r.post.id)])];
+  let shown = false;
+  const strip = h('div', { class: 'basis-strip' }, basis.map((id) => {
+    const post = db.byId.get(id);
+    return h('img', { src: thumbUrl(post), alt: post.title, title: post.title });
   }));
+  const el = h('div', { class: 'module recommend-page' },
+    screenHeader('구매 추천'),
+    h('div', { class: 'recommend-head' },
+      h('h2', null, '이런 굿즈는 어떠세요?'),
+      h('p', { class: 'hint' }, `찜한 굿즈 ${basis.length}개와 비슷한 계열의 굿즈를 골랐어요.`),
+      strip),
+    postGrid(items, {
+      section: 'recommend', priceCheck: true,
+      onOpen: (item, pos) => openPost(item, { from: 'r_recommend', ...pos, chain_depth: 1 }),
+    }));
+  return {
+    id: 'r_recommend', el,
+    onShow: () => {
+      if (shown) return;
+      shown = true;
+      logger.log('recommend_page_open', null, {
+        basis,
+        results: recs.map((r, i) => ({ post_id: r.post.id, rank: i + 1, score: Number(r.score.toFixed(4)), reason_post_id: r.reason.id })),
+      });
+    },
+  };
 }
 
 export function rootScreen() {
   let category = null;
   const count = h('div', { class: 'result-count' });
   const list = h('div', { class: 'results' });
+  const likeCount = h('span', { class: 'like-count' });
+  const recommendBtn = h('button', {
+    class: 'btn primary small', type: 'button',
+    onclick: () => {
+      if (task.likes.size < needLikes()) return toast(`굿즈를 ${needLikes()}개 찜하면 추천을 볼 수 있어요 (지금 ${task.likes.size}개)`);
+      nav.push(recommendScreen());
+    },
+  }, '구매 추천 보기');
+  const refreshBar = () => {
+    const n = task.likes.size;
+    likeCount.textContent = `♥ 찜 ${n}/${needLikes()}`;
+    recommendBtn.classList.toggle('disabled', n < needLikes());
+  };
   const render = () => {
     const items = keywordSearch({ category }).map((post) => ({ post }));
     count.textContent = `${category ?? '전체'} ${items.length}개`;
-    list.replaceChildren(postGrid(items, { section: 'feed', onOpen: (item, pos) => openPost(item, { from: 'r_feed', ...pos, chain_depth: 0 }) }));
+    list.replaceChildren(postGrid(items, { section: 'feed', priceCheck: true, onOpen: (item, pos) => openPost(item, { from: 'r_feed', ...pos, chain_depth: 0 }) }));
     el.scrollTop = 0;
   };
   const categoryChips = chips([[null, '전체'], ...CATEGORIES.map((c) => [c, c])], {
@@ -43,7 +86,10 @@ export function rootScreen() {
       render();
     },
   });
-  const el = h('div', { class: 'module' }, h('div', { class: 'module-head' }, categoryChips), count, list);
+  const el = h('div', { class: 'module' },
+    h('div', { class: 'module-head' }, h('div', { class: 'like-bar' }, likeCount, recommendBtn), categoryChips),
+    count, list);
   render();
-  return { id: 'r_feed', el };
+  refreshBar();
+  return { id: 'r_feed', el, onShow: refreshBar };
 }

@@ -16,12 +16,12 @@ export const logger = {
 
   get active() { return !!this.session; },
 
-  async start({ participant, order_group, location_note, plan, protocol_version, backend }) {
+  async start({ participant, order_group, location_note, plan, protocol_version, backend, test = false }) {
     const now = Date.now();
     const day = isoNow(now).slice(0, 10).replaceAll('-', '');
     this.session = {
       session_id: `S${day}-${participant}-${uid(4)}`,
-      participant, order_group, location_note,
+      participant, order_group, location_note, test,
       started_at: isoNow(now), started_ms: now, ended_at: null,
       consent: null,
       app_version: APP_VERSION, model_version: MODEL_VERSION, protocol_version,
@@ -141,7 +141,7 @@ export async function buildBundle(sessionId) {
   return {
     schema_version: 1,
     session: {
-      session_id: s.session_id, participant: s.participant, order_group: s.order_group,
+      session_id: s.session_id, participant: s.participant, test: !!s.test, order_group: s.order_group,
       started_at: s.started_at, ended_at: s.ended_at, location_note: s.location_note, consent: s.consent,
       app_version: s.app_version, model_version: s.model_version, protocol_version: s.protocol_version, device: s.device,
     },

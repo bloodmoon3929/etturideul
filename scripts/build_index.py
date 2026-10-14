@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 
 import numpy as np
 import yaml
@@ -41,6 +42,34 @@ def make_thumbs(posts: list[dict]) -> None:
     for old in THUMBS.glob("*.webp"):   # 지난 빌드의 남은 파일 정리 (과업 카드 이미지는 build_protocol이 다시 만든다)
         if old.name not in keep:
             old.unlink()
+
+
+# ── 판매가와 본문 금액 비교 ────────────────────────────────────────────
+# 본문에서 "15,000원", "2만원" 같은 금액을 찾아 판매가와 비교한다. 앱은 결과가 있는 게시물에 "가격 확인" 안내를 띄운다.
+AMOUNT = re.compile(r"(\d{1,3}(?:,\d{3})+|\d+)\s*원|(\d+(?:\.\d+)?)\s*만\s*원?")
+SKIP_WORDS = ("택배", "배송", "배달", "정가", "원가")   # 판매가와 상관없는 금액이 나오는 문장은 건너뛴다
+
+
+def price_check(post: dict) -> dict | None:
+    found = []
+    # 쉼표는 천 단위 구분(30,000)이 아닐 때만 문장을 나눈다
+    for clause in re.split(r"\n|,(?!\d{3})|[/·]|(?<=[.!?])\s", post["description"]):
+        if any(word in clause for word in SKIP_WORDS):
+            continue
+        prev_end = 0
+        for m in AMOUNT.finditer(clause):
+            amount = int(m.group(1).replace(",", "")) if m.group(1) else int(float(m.group(2)) * 10000)
+            label = re.sub(r"\s+", " ", clause[prev_end:m.start()]).strip(" :-")   # 금액 바로 앞의 말(상품 이름 등)
+            found.append({"label": label, "price": amount})
+            prev_end = m.end()
+    if not found:
+        return None
+    listed = post["price"]
+    if listed <= 1000:   # 일괄 판매: 판매가를 1원처럼 임시로 적고 본문에 가격을 쓴 경우
+        return {"status": "bundle", "listed": listed, "mentioned": found}
+    if any(abs(f["price"] - listed) / listed > 0.03 for f in found):
+        return {"status": "mismatch", "listed": listed, "mentioned": found}
+    return None
 
 
 def build_protocol(protocol: dict, posts: list[dict]) -> dict:
@@ -102,6 +131,13 @@ def main() -> None:
     write_json(WEB_DATA / "similar.json", similar, indent=None)
 
     print("[4/4] 게시물·출처·과업 정의·파일 목록")
+    flagged = 0
+    for p in posts:
+        check = price_check(p)
+        if check:
+            p["price_check"] = check
+            flagged += 1
+    print(f"  판매가와 본문 금액이 다른 게시물 {flagged}개")
     write_json(WEB_DATA / "posts.json", posts, indent=None)
     used = {p["image_source_id"] for p in posts}
     credit_keys = ("id", "title", "creator", "creator_url", "license_name", "license_url", "landing_url", "provider", "modified")

@@ -3,7 +3,7 @@
 // Task 사이에는 연구자 콘솔을 거치지 않고 "다음 Task" 안내 화면(taskIntroScreen)으로 이어진다.
 // 모듈(A~E)은 여기서 열리고, 정답·찜 같은 Task 상태는 task 객체가 갖는다.
 
-import { db } from './data.js';
+import { db, realPrice } from './data.js';
 import { logger } from './logger.js';
 import { nav } from './nav.js';
 import { h, won, formatDuration, squash, onLongPress } from './util.js';
@@ -39,7 +39,8 @@ export const task = {
   timer: null,
 
   get type() { return this.def?.type ?? null; },
-  wantsAnswer() { return this.type === 'find_same' || this.type === 'find_named'; },
+  wantsAnswer() { return ['find_same', 'find_named', 'find_cheapest'].includes(this.type); },
+  extra: {},          // Task 종류별 상태 (구매 추천: 추천을 보여 주었는지, 무엇을 추천했는지)
   wantsLikes() { return LIKE_TYPES.has(this.type) || this.demo; },
 
   // 이 게시물이 Task의 정답인가. Task와 무관하면 null (기록 시점에 계산해 로그에 넣는다, PLAN 14.6.2)
@@ -58,6 +59,22 @@ export const task = {
     return i < 0 ? null : i + 1;
   },
 
+  // 가장 싸게 파는 게시물 찾기: 고른 게시물의 실제 가격이 대상 상품의 가장 낮은 실제 가격과 같아야 정답
+  cheapestAnswer(post) {
+    const key = this.target?.product_key;
+    const prices = db.posts.map((p) => realPrice(p, key)).filter((v) => v != null);
+    const cheapest = prices.length ? Math.min(...prices) : null;
+    const real = realPrice(post, key);
+    return {
+      post_id: post.id, same_product: post.product_key === key, contains_target: real != null,
+      price: post.price, real_price: real, cheapest_price: cheapest, is_correct: real != null && real === cheapest,
+    };
+  },
+
+  answerFor(post) {
+    return this.type === 'find_cheapest' ? this.cheapestAnswer(post) : { post_id: post.id, is_correct: this.isTarget(post) };
+  },
+
   trueMinPrice() {
     const prices = db.posts.filter((p) => p.product_key === this.target?.product_key).map((p) => p.price);
     return prices.length ? Math.min(...prices) : null;
@@ -65,8 +82,8 @@ export const task = {
 
   submitAnswer(post, ctx = {}) {
     this.answerPostId = post.id;
-    logger.log('answer_submit', 'btn_answer', { post_id: post.id, is_correct: this.isTarget(post), from_screen: ctx.from ?? null, rank: ctx.rank ?? null });
-    toast('이 상품으로 골랐어요. 아래 [완료]를 눌러 주세요');
+    logger.log('answer_submit', 'btn_answer', { ...this.answerFor(post), from_screen: ctx.from ?? null, rank: ctx.rank ?? null });
+    toast(`${this.type === 'find_cheapest' ? '이 게시물로' : '이 상품으로'} 골랐어요. 아래 [완료]를 눌러 주세요`);
     renderBottom();
   },
 
@@ -127,7 +144,7 @@ export function taskIntroScreen(run, { onStart, onResearcher }) {
   let started = false;
   const el = h('div', { class: 'module task-intro' },
     h('div', { class: 'task-title' }, number,
-      run.condition ? h('span', { class: `cond-chip ${run.condition}` }, CONDITION_LABEL[run.condition]) : null),
+      run.condition ? h('span', { class: `cond-chip ${run.condition}` }, (def.condition_label ?? CONDITION_LABEL[run.condition])) : null),
     h('h2', null, def.name),
     h('p', { class: 'intro-text' }, instructionFor(def, target, run.condition)),
     targetPreview(def, target),
@@ -153,7 +170,7 @@ function renderTop() {
       h('div', { class: 'task-title' },
         h('span', { class: 'task-no' }, task.demo ? '데모' : `Task ${run.order_index}${total ? `/${total}` : ''}`),
         h('strong', null, def.name),
-        !task.demo && run.condition ? h('span', { class: `cond-chip ${run.condition}` }, CONDITION_LABEL[run.condition]) : null),
+        !task.demo && run.condition ? h('span', { class: `cond-chip ${run.condition}` }, (def.condition_label ?? CONDITION_LABEL[run.condition])) : null),
       def.instruction ? h('button', {
         class: 'link-btn', type: 'button',
         onclick: () => {
@@ -226,7 +243,7 @@ export async function startTask(run, { demo = false, onEnd = null, resumed = fal
     run, def, demo, onEnd,
     target: demo ? null : (run.set ? protocol.targets[run.set]?.[run.task_id] : null) || null,
     moduleId: demo ? run.moduleId : def.modules[run.condition],
-    answerPostId: null, likes: new Set(), timer: null,
+    answerPostId: null, likes: new Set(), timer: null, extra: {},
   });
   instructionOpen = true;
   autoCollapsed = false;
@@ -246,12 +263,13 @@ async function done() {
   if (task.wantsAnswer()) {
     if (!task.answerPostId) return toast('먼저 게시물을 열고 [이 상품이에요]를 눌러 주세요');
     const post = db.byId.get(task.answerPostId);
-    const answer = { post_id: post.id, is_correct: task.isTarget(post) };
+    const answer = task.answerFor(post);
     if (def.ask_min_price) Object.assign(answer, await askMinPrice());
     return finish('done', answer);
   }
   if (LIKE_TYPES.has(task.type)) {
     if (task.likes.size < (def.n_likes ?? 0)) return toast(`굿즈를 ${def.n_likes}개 찜해 주세요 (지금 ${task.likes.size}개)`);
+    if (task.type === 'recommend' && !task.extra.recommended) return toast('위의 [구매 추천 보기]를 눌러 추천을 먼저 확인해 주세요');
     return finish('done', likeAnswer());
   }
   return finish('done', null);
@@ -260,6 +278,14 @@ async function done() {
 function likeAnswer() {
   const liked = [...task.likes];
   const answer = { liked };
+  if (task.type === 'recommend') {   // 추천을 보기 전에 찜한 것(취향의 바탕)과 추천을 본 뒤 찜한 것을 나눈다
+    const basis = task.extra.basis || [];
+    Object.assign(answer, {
+      basis, recommended: task.extra.recommended || [],
+      liked_after: liked.filter((id) => !basis.includes(id)),
+      liked_from_recommend: liked.filter((id) => (task.extra.recommended || []).includes(id)),
+    });
+  }
   if (task.type === 'find_series') answer.n_series_match = liked.filter((id) => task.isTarget(db.byId.get(id))).length;
   return answer;
 }
@@ -297,7 +323,7 @@ function askMinPrice() {
 async function skip() {
   if (!(await confirmDialog('이 Task를 건너뛸까요?', { ok: '건너뛰기', cancel: '계속하기' }))) return;
   const partial = task.wantsAnswer()
-    ? (task.answerPostId ? { post_id: task.answerPostId, is_correct: task.isTarget(db.byId.get(task.answerPostId)) } : null)
+    ? (task.answerPostId ? task.answerFor(db.byId.get(task.answerPostId)) : null)
     : (task.likes.size ? likeAnswer() : null);
   finish('skipped', partial, { by: 'participant' });
 }

@@ -2,6 +2,7 @@
 
 입력
   data/draft_curation.json   사진별 게시물 문구(제목·설명·가격·상태·태그)와 같은 상품 그룹(product_key)
+  data/extra_posts.yaml      Task용으로 더하는 게시물(같은 상품 여러 개, 이름 없는 제목, 일괄 판매)과 기존 게시물 수정
   data/image_review.json     (있으면) 사람 검수 결과. rejected 사진의 게시물은 빼고, 검수자가 고친 값으로 덮어쓴다
 출력
   data/posts.json            게시물 (PLAN 4.1 스키마 + title_style, product_name, seller)
@@ -26,7 +27,7 @@ BASE_DATE = date(2026, 10, 12)
 LOCATIONS = ["별빛동", "솔내음동", "은하수동", "달맞이동", "새벽동", "가람동", "한울동", "꽃내동"]
 SELLER_WORDS = ["굿즈창고", "덕질졸업", "피규어정리", "책상비우기", "수집가", "이사정리", "굿즈나눔", "취미방"]
 CONDITIONS = ["미개봉", "거의 새것", "사용감 있음", "박스 없음"]
-TITLE_STYLES = ["formal", "abbr", "typo", "char_only", "no_series", "english"]
+TITLE_STYLES = ["formal", "abbr", "typo", "char_only", "no_series", "english", "generic"]   # generic: "인형 팝니다"처럼 상품 이름이 없는 제목
 
 # 가상 사용자: 어떤 게시물을 찜했을지 고르는 규칙
 PERSONAS = [
@@ -59,6 +60,12 @@ def main() -> None:
     if not curation:
         raise SystemExit(f"{args.input}이 없습니다")
     held_out = card_images()
+    # Task용 추가 게시물과 기존 게시물 수정
+    extra_path = DATA / "extra_posts.yaml"
+    extra = yaml.safe_load(extra_path.read_text(encoding="utf-8")) if extra_path.exists() else {}
+    overrides = extra.get("overrides") or {}
+    curation["posts"] = [{**e, **overrides.get(e["image_id"], {})} for e in curation["posts"]]
+    curation["posts"] += [{"image_id": p["image"], **{k: v for k, v in p.items() if k != "image"}} for p in extra.get("posts") or []]
     review = {r["image_id"]: r for r in (read_json(DATA / "image_review.json", {}) or {}).get("items", [])}
     sources = {s["id"] for s in read_json(DATA / "image_sources.json", [])}
 
@@ -106,7 +113,9 @@ def main() -> None:
             "image": f"thumbs/{e['image_id']}.webp",
             "image_large": f"thumbs/{e['image_id']}_l.webp",
             "image_source_id": e["image_id"],
-            "augmented": bool(e.get("augmented", False)),
+            "augmented": "_a" in e["image_id"],
+            # 판매가와 실제 가격이 다른 게시물(본문에서만 가격을 바꿈, 일괄 판매)의 실제 가격. 평가에만 쓴다
+            **({"real_prices": e["real_prices"]} if e.get("real_prices") else {}),
             "location": rng.choice(LOCATIONS),
             "seller": f"{rng.choice(SELLER_WORDS)}{rng.randint(10, 99)}",
             "created_at": (BASE_DATE - timedelta(days=rng.randint(0, 29))).isoformat(),

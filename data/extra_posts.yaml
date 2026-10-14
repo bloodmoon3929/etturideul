@@ -1,0 +1,174 @@
+# Task 1·2("가장 싸게 파는 게시물 찾기")를 위한 게시물. make_dummy.py가 draft_curation.json의 게시물에 더한다.
+#
+# - Task 대상 굿즈(세이버 피그마, 리볼텍 단보)는 가격·문구를 다르게 여러 개 올린다.
+#   실제로 가장 싼 게시물은 제목에 상품 이름이 없다("피규어 팝니다", "물건 팝니다").
+# - 판매가와 본문 금액이 다른 게시물(가격을 본문에서만 내림), 판매가 1원짜리 일괄 판매 게시물을 섞는다.
+# - image: 사진 id. "img_0100_a1"처럼 _aN이 붙은 것은 scripts/augment_images.py가 만든 증강 사진이다(다른 판매자가 찍은 것처럼 보이게).
+# - real_prices: 평가용 실제 가격. 본문 가격이 실제 가격인 게시물과 일괄 판매 게시물에만 적는다(없으면 판매가가 실제 가격).
+# - overrides: draft_curation.json에 있던 게시물의 값을 고친다(사진 id 기준).
+
+overrides:
+  img_0058: {price: 31000}
+
+posts:
+  # ── 세이버 피그마 (Task 1 대상, figma-003-saber-armor) ──────────────
+  # 실제 최저가: img_0060 22,000원 (제목에 이름 없음)
+  - image: img_0060
+    product_key: figma-003-saber-armor
+    product_name: figma 003 세이버 갑옷 ver.
+    category: 피규어
+    series: Fate
+    title: 피규어 팝니다
+    title_style: generic
+    description: 책상 정리하면서 내놓아요. 관절 튼튼하고 검이랑 손 파츠 다 있습니다.
+    price: 22000
+    condition: 박스 없음
+    tags: [피규어, 정리]
+  - image: img_0062
+    product_key: figma-003-saber-armor
+    product_name: figma 003 세이버 갑옷 ver.
+    category: 피규어
+    series: Fate
+    title: 세이버 피규어 가격 내림
+    title_style: char_only
+    description: 처음 30,000원에 올렸는데 24,000원으로 내립니다. 검 두 자루 포함이에요.
+    price: 30000
+    real_prices: {figma-003-saber-armor: 24000}
+    condition: 박스 없음
+    tags: [세이버, 피규어]
+  - image: img_0054
+    product_key: figma-003-saber-armor
+    product_name: figma 003 세이버 갑옷 ver.
+    category: 피규어
+    series: Fate
+    title: 피그마 세이버 검 포함
+    title_style: abbr
+    description: 전시만 했던 거라 깨끗해요. 직거래는 주말에 가능합니다.
+    price: 33000
+    condition: 거의 새것
+    tags: [피그마, 세이버, 페이트]
+  - image: img_0072
+    product_key: bundle-figma-p3
+    product_name: 피그마 일괄 (페르소나3 외)
+    category: 피규어
+    series: 기타
+    title: 피규어 정리합니다 일괄
+    title_style: generic
+    description: |-
+      피그마 정리합니다. 가격은 본문 보시고 연락 주세요.
+      피그마 메티스 25,000원
+      피그마 아이기스 22,000원
+      코로마루 8,000원
+      피그마 세이버 갑옷 버전 28,000원 (사진에는 없어요)
+    price: 1
+    real_prices: {figma-003-saber-armor: 28000}
+    condition: 사용감 있음
+    tags: [피그마, 일괄]
+
+  # ── 리볼텍 단보 아마존 박스 버전 (Task 2 대상, revoltech-danboard-amazon) ─
+  # 실제 최저가: img_0100_a1 19,000원 (제목에 이름 없음)
+  - image: img_0100_a1
+    product_key: revoltech-danboard-amazon
+    product_name: 리볼텍 단보 Amazon.co.jp 박스 ver.
+    category: 피규어
+    series: 요츠바랑!
+    title: 물건 팝니다
+    title_style: generic
+    description: 방 정리하다 나온 거 팝니다. 눈에 불 들어오는 것 확인했어요.
+    price: 19000
+    condition: 박스 없음
+    tags: [정리, 급처]
+  - image: img_0091_a1
+    product_key: revoltech-danboard-amazon
+    product_name: 리볼텍 단보 Amazon.co.jp 박스 ver.
+    category: 피규어
+    series: 요츠바랑!
+    title: 단보 피규어 가격 내렸어요
+    title_style: char_only
+    description: 27,000원에 올렸다가 21,000원으로 내렸어요. 관절 헐거움 없습니다.
+    price: 27000
+    real_prices: {revoltech-danboard-amazon: 21000}
+    condition: 사용감 있음
+    tags: [단보, 피규어]
+  - image: img_0096
+    product_key: revoltech-danboard-amazon
+    product_name: 리볼텍 단보 Amazon.co.jp 박스 ver.
+    category: 피규어
+    series: 요츠바랑!
+    title: 아마존 단보 팝니다
+    title_style: abbr
+    description: 사진 찍으려고 샀는데 잘 안 꺼내게 돼서 팝니다. 스탠드 포함이에요.
+    price: 32000
+    condition: 거의 새것
+    tags: [단보, 아마존]
+  - image: img_0092
+    product_key: bundle-danbo-set
+    product_name: 단보 일괄 (큰 단보 + 미니 단보)
+    category: 피규어
+    series: 요츠바랑!
+    title: 단보 일괄 판매
+    title_style: char_only
+    description: |-
+      단보 정리합니다. 가격은 본문 보시고 연락 주세요.
+      큰 단보 (아마존 박스) 24,000원
+      미니 단보 1개 9,000원
+      한꺼번에 가져가시면 45,000원
+    price: 1
+    real_prices: {revoltech-danboard-amazon: 24000}
+    condition: 사용감 있음
+    tags: [단보, 일괄]
+
+  # ── 그 밖의 이름 없는 제목·일괄 판매 ──────────────────────────────────
+  - image: img_0354
+    product_key: totoro-plush-large-shop
+    product_name: 이웃집 토토로 큰 토토로 봉제인형
+    category: 인형
+    series: 이웃집 토토로
+    title: 인형 팝니다
+    title_style: generic
+    description: 사진 맨 앞의 큰 인형만 팝니다. 털 빠짐 없어요.
+    price: 18000
+    condition: 사용감 있음
+    tags: [인형]
+  - image: img_0190
+    product_key: rg-rx-78-2-gundam
+    product_name: RG 1/144 RX-78-2 건담
+    category: 프라모델
+    series: 건담
+    title: 프라모델 팝니다
+    title_style: generic
+    description: 조립만 하고 장식장에 두었던 거예요. 무기 다 있습니다.
+    price: 19000
+    condition: 박스 없음
+    tags: [프라모델, 완성품]
+  - image: img_0419
+    product_key: bundle-dog-plush
+    product_name: 강아지 인형 일괄
+    category: 인형
+    series: 기타
+    title: 인형 일괄 판매
+    title_style: generic
+    description: |-
+      강아지 인형들 정리해요. 가격은 본문 참고해 주세요.
+      분홍 강아지 인형 12,000원
+      누워 있는 시바 인형 15,000원
+      하얀 강아지 인형 10,000원
+      세 개 다 하시면 32,000원
+    price: 1
+    condition: 거의 새것
+    tags: [인형, 일괄]
+  - image: img_0353
+    product_key: bundle-totoro-plush
+    product_name: 토토로 인형 일괄
+    category: 인형
+    series: 이웃집 토토로
+    title: 토토로 인형 여러 개 팝니다
+    title_style: char_only
+    description: |-
+      토토로 인형 여러 개 있어요. 사진에 있는 것 중 고르시면 됩니다.
+      큰 토토로 20,000원
+      중간 토토로 13,000원
+      작은 토토로 8,000원
+    price: 1
+    condition: 사용감 있음
+    tags: [토토로, 인형, 일괄]

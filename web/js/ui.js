@@ -107,24 +107,62 @@ export function skeletonGrid(n = 6) {
 
 // ── 결과 카드 ─────────────────────────────────────────────────────────
 // item: { post, score?, tier?, raw? }. AI 모듈에서만 점수·등급 배지가 붙는다
-export function postCard(item, { onOpen } = {}) {
+// priceCheck: 판매가와 본문 금액이 다르면 가격 옆에 [가격 확인] 안내를 붙인다 (제안 방식 화면에서만)
+// item.note: 카드 아래에 한 줄 덧붙일 말 (구매 추천의 "○○와 비슷해요")
+export function postCard(item, { onOpen, priceCheck = false, logInfo = null } = {}) {
   const { post } = item;
+  const flag = priceCheck && post.price_check ? priceFlag(post, logInfo) : null;
   return h('button', { class: 'card', type: 'button', dataset: { id: post.id }, onclick: () => onOpen?.(item) },
     h('div', { class: 'card-img' },
       h('img', { src: thumbUrl(post), alt: '', loading: 'lazy', decoding: 'async' }),
       tierBadge(item)),
     h('div', { class: 'card-body' },
       h('div', { class: 'card-title' }, post.title),
-      h('div', { class: 'card-price' }, won(post.price)),
-      h('div', { class: 'card-meta' }, h('span', { class: 'cond' }, post.condition), ` ${post.location} · ${daysAgo(post.created_at)}`)));
+      h('div', { class: 'card-price' }, won(post.price), flag),
+      h('div', { class: 'card-meta' }, h('span', { class: 'cond' }, post.condition), ` ${post.location} · ${daysAgo(post.created_at)}`),
+      item.note ? h('div', { class: 'card-note' }, item.note) : null));
+}
+
+// ── 가격 확인 안내 ────────────────────────────────────────────────────
+// 판매가와 본문에 적힌 금액이 다를 때(일괄 판매의 1원 등) 카드와 상세 화면에 붙는 작은 버튼.
+// 금액 비교는 scripts/build_index.py의 price_check가 미리 해 둔다
+export function priceFlag(post, logInfo = null) {
+  const open = (e) => {
+    e.stopPropagation();   // 카드를 누른 것으로 처리하지 않는다
+    e.preventDefault();
+    openPriceCheck(post, logInfo);
+  };
+  return h('span', {
+    class: 'price-flag', role: 'button', tabindex: 0, 'aria-label': '가격 확인',
+    onclick: open, onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') open(e); },
+  }, '⚠ 가격 확인');
+}
+
+export function openPriceCheck(post, logInfo = null) {
+  const check = post.price_check;
+  logger.log('price_warning_open', 'price_flag', { post_id: post.id, status: check.status, listed: check.listed, mentioned: check.mentioned.map((m) => m.price), ...(logInfo || {}) });
+  const bundle = check.status === 'bundle';
+  sheet({
+    title: '가격을 확인해 주세요',
+    content: [
+      h('p', { class: 'sheet-text' }, bundle
+        ? `판매가가 ${won(check.listed)}으로 적혀 있지만, 본문에는 상품별 가격이 따로 적혀 있어요. 일괄 판매 게시물은 판매가를 임시로 적어 두는 경우가 많습니다.`
+        : `판매가는 ${won(check.listed)}인데, 본문에는 다른 금액이 적혀 있어요. 가격을 바꾸고 판매가는 고치지 않았을 수 있습니다.`),
+      h('div', { class: 'price-table' },
+        h('div', { class: 'price-row head' }, h('span', null, '판매가'), h('b', null, won(check.listed))),
+        check.mentioned.map((m) => h('div', { class: 'price-row' }, h('span', null, bundle && m.label ? m.label : '본문에 적힌 금액'), h('b', null, won(m.price))))),
+      h('p', { class: 'sheet-text small' }, '실제 가격은 판매자에게 확인하세요. 이 안내는 게시물 글에서 금액을 찾아 자동으로 비교한 것입니다.'),
+    ],
+  });
 }
 
 // 결과 목록. 카드가 화면에 절반 이상 보이면 result_impression, 누르면 result_click을 남긴다
-export function postGrid(items, { section = 'results', rankOffset = 0, onOpen } = {}) {
+export function postGrid(items, { section = 'results', rankOffset = 0, onOpen, priceCheck = false } = {}) {
   const grid = h('div', { class: 'grid' });
   const seen = new Set();
   const info = (item, rank) => ({
     post_id: item.post.id, rank, score: item.score ?? null, tier: item.tier ?? null, section, is_target: task.isTarget(item.post),
+    price_flag: priceCheck ? item.post.price_check?.status ?? null : null,
   });
   const observer = new IntersectionObserver((entries) => {
     for (const entry of entries) {
@@ -139,6 +177,7 @@ export function postGrid(items, { section = 'results', rankOffset = 0, onOpen } 
   items.forEach((item, i) => {
     const rank = rankOffset + i + 1;
     const card = postCard(item, {
+      priceCheck, logInfo: { rank, section },
       onOpen: () => {
         logger.log('result_click', 'card', info(item, rank));
         onOpen?.(item, { rank, section });
@@ -157,7 +196,7 @@ export const resultRows = (items) => items.slice(0, 20).map((it, i) => ({
 }));
 
 // 유사도 결과를 등급별 구역(같은 상품 / 비슷한 상품 / 관련 낮음)으로 나눠 그린다. 순위는 구역을 이어서 매긴다
-export function tierSections(container, items, { onOpen, includeInStats = [], lowLimit = 10 }) {
+export function tierSections(container, items, { onOpen, includeInStats = [], lowLimit = 10, priceCheck = false }) {
   const same = items.filter((it) => it.tier === 'same');
   const similar = items.filter((it) => it.tier === 'similar');
   const low = items.filter((it) => it.tier === 'low').slice(0, lowLimit);
@@ -166,12 +205,12 @@ export function tierSections(container, items, { onOpen, includeInStats = [], lo
     container.append(
       h('h3', { class: 'section-title' }, `${TIER_LABEL.same} ${same.length}개`),
       priceSummary(priceStats([...includeInStats, ...same.map((it) => it.post)])),
-      postGrid(same, { section: 'same', onOpen }));
+      postGrid(same, { section: 'same', onOpen, priceCheck }));
   }
   if (similar.length) {
     container.append(
       h('h3', { class: 'section-title' }, `${TIER_LABEL.similar} ${similar.length}개`),
-      postGrid(similar, { section: 'similar', rankOffset: same.length, onOpen }));
+      postGrid(similar, { section: 'similar', rankOffset: same.length, onOpen, priceCheck }));
   }
   if (!same.length && !similar.length) {
     container.append(emptyState('비슷한 굿즈를 찾지 못했어요. 다른 사진이나 표현으로 다시 찾아보세요.'));
@@ -184,7 +223,7 @@ export function tierSections(container, items, { onOpen, includeInStats = [], lo
         e.target.remove();
         logger.log('low_results_open', 'btn_more', { n: low.length });
         more.append(h('h3', { class: 'section-title' }, TIER_LABEL.low),
-          postGrid(low, { section: 'low', rankOffset: same.length + similar.length, onOpen }));
+          postGrid(low, { section: 'low', rankOffset: same.length + similar.length, onOpen, priceCheck }));
       },
     }, '관련이 낮은 게시물 더 보기'), more);
   }
@@ -204,7 +243,8 @@ export function detailScreen(item, ctx) {
     likeBtn.classList.toggle('on', liked);
     likeBtn.classList.toggle('primary', task.wantsLikes() && !liked);
     const chosen = task.answerPostId === post.id;
-    answerBtn.textContent = chosen ? '✓ 이 상품으로 골랐어요' : '이 상품이에요';
+    const cheapest = task.type === 'find_cheapest';
+    answerBtn.textContent = chosen ? (cheapest ? '✓ 이걸로 골랐어요' : '✓ 이 상품으로 골랐어요') : (cheapest ? '이걸로 살래요' : '이 상품이에요');
     answerBtn.classList.toggle('on', chosen);
   };
   likeBtn.onclick = () => { task.toggleLike(post, ctx); refresh(); };
@@ -217,7 +257,7 @@ export function detailScreen(item, ctx) {
     h('div', { class: 'detail-body' },
       tierBadge(item),
       h('h2', null, post.title),
-      h('div', { class: 'detail-price' }, won(post.price)),
+      h('div', { class: 'detail-price' }, won(post.price), ctx.priceCheck && post.price_check ? priceFlag(post, { from_screen: ctx.screenId }) : null),
       h('div', { class: 'detail-meta' },
         h('span', { class: 'cond' }, post.condition), ` ${post.category} · ${post.location} · ${daysAgo(post.created_at)} · ${post.seller}`),
       h('p', { class: 'detail-desc' }, post.description),

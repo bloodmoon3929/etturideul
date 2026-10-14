@@ -52,15 +52,16 @@ const jsonBlob = (obj) => new Blob([JSON.stringify(obj)], { type: 'application/j
 // [JSON 파일로 저장]: 폰의 다운로드 폴더에 세션 묶음 파일을 만든다. 분석 스크립트가 이 파일을 그대로 읽는다
 export async function exportSessionJson(sessionId) {
   const bundle = await buildBundle(sessionId);
-  downloadBlob(jsonBlob(bundle), `${sessionId}.json`);
+  const prefix = bundle.session.test ? 'TEST_' : '';   // 테스트 세션은 파일 이름으로도 구분한다
+  downloadBlob(jsonBlob(bundle), `${prefix}${sessionId}.json`);
   // 리플레이는 용량이 커서 gzip으로 묶어 따로 저장한다 (압축을 지원하지 않는 브라우저에서는 그대로 저장)
   const replay = await buildReplay(sessionId);
   if (replay.events.length) {
     if (typeof CompressionStream === 'function') {
       const zipped = await new Response(jsonBlob(replay).stream().pipeThrough(new CompressionStream('gzip'))).blob();
-      downloadBlob(new Blob([zipped], { type: 'application/gzip' }), `${sessionId}_replay.json.gz`);
+      downloadBlob(new Blob([zipped], { type: 'application/gzip' }), `${prefix}${sessionId}_replay.json.gz`);
     } else {
-      downloadBlob(jsonBlob(replay), `${sessionId}_replay.json`);
+      downloadBlob(jsonBlob(replay), `${prefix}${sessionId}_replay.json`);
     }
   }
   const record = await sessions.get(sessionId);

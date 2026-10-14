@@ -54,17 +54,18 @@ export function showConsole() {
   nav.reset(consoleScreen());
 }
 
-async function startSession({ participant, orderGroup, locationNote }) {
+async function startSession({ participant, orderGroup, locationNote, test = false }) {
   const session = await logger.start({
     participant, order_group: orderGroup, location_note: locationNote,
-    plan: buildPlan(participant, orderGroup), protocol_version: db.protocol.version, backend: ml.backendLabel(),
+    plan: buildPlan(participant, orderGroup), protocol_version: db.protocol.version, backend: ml.backendLabel(), test,
   });
   if (orderGroup != null && orderGroup !== autoGroup(participant)) logger.log('order_group_override', null, { auto: autoGroup(participant), chosen: orderGroup });
   for (const which of ['text', 'vision']) {
     const m = ml.models[which];
     if (m) logger.log('model_ready', which, { which, backend: `${m.device}/${m.dtype}`, load_ms: m.load_ms, fallback: m.fallback });
   }
-  await kv.set('last_participant_no', participantNo(participant));
+  // 테스트 세션은 번호를 따로 센다(T01, T02 …). 실제 참여자 번호(P01 …)가 늘어나지 않게 한다
+  await kv.set(test ? 'last_test_no' : 'last_participant_no', participantNo(participant));
   keepAwake();
   showConsent(session);
 }
@@ -103,8 +104,9 @@ const afterTask = (run) => ({ def }) => {
 };
 
 // 남아 있는 세션을 지금의 Task 구성으로 이어 갈 수 있는가.
-// Task 정의(protocol)가 바뀌면 예전 구성으로 만든 세션은 이어 갈 수 없다
-export const sessionUsable = (session) => session.task_runs.every((r) => db.protocol.tasks[r.task_id]);
+// Task 정의(protocol.yaml의 version)가 바뀌면 예전 구성으로 만든 세션은 이어 갈 수 없다
+export const sessionUsable = (session) =>
+  session.protocol_version === db.protocol.version && session.task_runs.every((r) => db.protocol.tasks[r.task_id]);
 
 // 이어 갈 수 없는 세션을 닫는다. 기록은 지우지 않고 "저장 대기"로 옮긴다
 export async function closeStaleSession(session) {
@@ -332,7 +334,13 @@ function consoleScreen() {
         if (!/^P\d+$/.test(p)) return toast('참여자 번호는 P01 형식으로 적어 주세요');
         startSession({ participant: p, orderGroup: fixedOrder ? null : Number(group.value), locationNote: note.value.trim() });
       } }, '세션 시작'),
-      h('p', { class: 'hint center' }, '누르면 동의 화면이 열립니다. 그대로 참여자에게 건네주세요.'));
+      h('p', { class: 'hint center' }, '누르면 동의 화면이 열립니다. 그대로 참여자에게 건네주세요.'),
+      h('div', { class: 'test-start' },
+        h('button', { class: 'btn small ghost', type: 'button', onclick: async () => {
+          const no = (await kv.get('last_test_no', 0)) + 1;
+          startSession({ participant: `T${String(no).padStart(2, '0')}`, orderGroup: fixedOrder ? null : Number(group.value), locationNote: '테스트', test: true });
+        } }, '테스트 세션 시작'),
+        h('small', null, '번호를 T01, T02…로 따로 매기고, 기록과 파일 이름에 테스트라고 표시합니다')));
   }
 
   // ── 진행 중인 세션 ──────────────────────────────────────────────────
@@ -363,7 +371,7 @@ function consoleScreen() {
       h('div', { class: 'session-head' },
         h('div', null,
           h('div', { class: 'eyebrow' }, '진행 중인 세션'),
-          h('h2', null, s.participant, s.order_group ? h('small', null, ` 그룹 ${s.order_group}`) : null)),
+          h('h2', null, s.participant, s.test ? h('span', { class: 'badge warn test-badge' }, '테스트') : null, s.order_group ? h('small', null, ` 그룹 ${s.order_group}`) : null)),
         h('div', { class: 'session-time' }, h('b', null, formatDuration(Date.now() - s.started_ms)), h('small', null, `${finished}/${s.task_runs.length} 끝남`))),
       h('ol', { class: 'steps' }, steps),
       !finalDone || running
@@ -406,7 +414,7 @@ function consoleScreen() {
       const n = (await events.of(s.session_id)).length;
       return h('div', { class: 'pending-card' },
         h('div', { class: 'pending-info' },
-          h('b', null, s.participant),
+          h('b', null, s.participant, s.test ? h('span', { class: 'badge warn test-badge' }, '테스트') : null),
           h('small', null, `${s.started_at.slice(5, 16).replace('T', ' ')} · 이벤트 ${n}건`),
           h('span', { class: `badge ${s.exported_at ? 'ok' : 'warn'}` }, s.exported_at ? '파일 저장됨' : '저장 안 함')),
         h('div', { class: 'pending-actions' },
@@ -438,9 +446,9 @@ function consoleScreen() {
         h('p', { class: 'hint' }, '[JSON 저장]을 누르면 세션마다 파일이 폰의 다운로드 폴더에 생깁니다.'),
         h('h4', null, '<세션 ID>.json'),
         h('ul', { class: 'info-list' },
-          item('세션 정보', '참여자 번호, 시작·종료 시각, 장소 메모, 동의 항목, 앱·모델·Task 버전, 브라우저 정보(User-Agent), 화면 크기, AI 실행 방식'),
-          item('Task 결과', 'Task별 시작·종료 시각, 완료·건너뜀, 고른 게시물과 정답 여부, 찜한 게시물'),
-          item('행동 기록', '본 화면과 머문 시간, 스크롤, 누른 버튼·게시물(순위·유사도 점수 포함), 입력한 검색어와 결과 상위 20개, 사진 검색에 고른 갤러리 사진, 추천 목록, 뒤로 가기. 모두 발생 시각이 함께 남습니다'),
+          item('세션 정보', '참여자 번호, 테스트 세션 여부, 시작·종료 시각, 장소 메모, 동의 항목, 앱·모델·Task 버전, 브라우저 정보(User-Agent), 화면 크기, AI 실행 방식'),
+          item('Task 결과', 'Task별 시작·종료 시각, 완료·건너뜀, 고른 게시물과 그 실제 가격·가장 싼 게시물이었는지, 찜한 굿즈(추천을 보기 전과 후), 추천받은 굿즈'),
+          item('행동 기록', '본 화면과 머문 시간, 스크롤, 누른 버튼·게시물(순위·유사도 점수 포함), 입력한 검색어와 결과 상위 20개, 사진 검색에 고른 갤러리 사진, 가격 확인 안내를 연 것, 구매 추천 목록, 뒤로 가기. 모두 발생 시각이 함께 남습니다'),
           item('마지막 질문', '찾을 때 원래 방식과 사진 검색 중 고른 것'),
           item('관찰 메모', '연구자가 콘솔에서 적은 메모와 시각')),
         h('h4', null, '<세션 ID>_replay.json.gz (화면 기록에 동의한 경우만)'),
