@@ -156,6 +156,7 @@ async function endSession(render) {
 
 // ── 오프라인 준비 상태 (PLAN 13.5) ────────────────────────────────────
 async function isCached(path) {
+  if (typeof caches === 'undefined') return false;   // https·localhost가 아니면 Cache Storage가 없다
   return !!(await caches.match(url(path), { ignoreSearch: true }));
 }
 

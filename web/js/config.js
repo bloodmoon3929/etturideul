@@ -12,14 +12,17 @@ export const url = (path) => new URL(path, APP_BASE).href;
 export const MODEL_IDS = { vision: 'etturi-clip-vision', text: 'etturi-clip-text-ml' };
 
 // 모델 파일을 받는 곳 (PLAN 6.3, 13.2). 주소는 host + pathTemplate + 파일 이름으로 만들어진다.
-// 지금은 앱과 같은 출처의 models/ 에서 받는다(개발용, scripts/dev_server.py가 models/ 디렉터리를 연결).
-export const MODEL_SOURCE = { host: APP_BASE, pathTemplate: 'models/{model}/', revision: 'main' };
-// 배포 시에는 Hugging Face Hub의 본인 저장소로 바꾸고, revision을 커밋 해시로 고정해 재배포 때 다시 받지 않게 한다.
-// export const MODEL_SOURCE = {
-//   host: 'https://huggingface.co/',
-//   pathTemplate: '<HF 사용자>/<저장소>/resolve/{revision}/{model}/',
-//   revision: '<커밋 해시>',
-// };
+//  - 이 컴퓨터(localhost)에서 열면: 앱과 같은 출처의 models/ (scripts/dev_server.py가 models/ 디렉터리를 연결)
+//  - 그 밖(GitHub Pages 등)에서 열면: Hugging Face Hub의 bloodmoon3929/etturideul-models.
+//    revision을 커밋 해시로 고정해, 저장소에 새 파일을 올려도 앱이 받는 모델은 바뀌지 않게 한다(바꾸려면 여기 해시를 고친다).
+const LOCAL_HOSTS = ['localhost', '127.0.0.1'];
+export const MODEL_SOURCE = LOCAL_HOSTS.includes(globalThis.location?.hostname)
+  ? { host: APP_BASE, pathTemplate: 'models/{model}/', revision: 'main' }
+  : {
+    host: 'https://huggingface.co/',
+    pathTemplate: 'bloodmoon3929/etturideul-models/resolve/{revision}/{model}/',
+    revision: '4675eb5d352b9e50733b078f131e521cc5c9a9ce',
+  };
 
 // 인코더별 실행 조합. M0 측정 결과로 DEFAULT_PRESET을 확정한다.
 //  q8    : 둘 다 int8 / WASM (합계 약 232MB, 모든 기기에서 동작)

@@ -27,7 +27,7 @@ function setupEnv(c) {
     wasm: c.ortBase + 'ort-wasm-simd-threaded.asyncify.wasm',
   };
   env.useWasmCache = false;      // WASM 런타임은 서비스 워커가 캐시한다
-  env.useBrowserCache = true;    // 모델 파일은 Cache Storage('transformers-cache')에 저장
+  env.useBrowserCache = typeof caches !== 'undefined';   // 모델 파일은 Cache Storage('transformers-cache')에 저장 (https·localhost에서만 있음)
   // 모델은 앱 버전에 고정한 경로에서만 받는다 (config.js의 MODEL_SOURCE)
   env.allowLocalModels = false;
   env.allowRemoteModels = true;
