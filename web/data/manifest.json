@@ -1,5 +1,5 @@
 {
-  "data_version": "2b53c9602c",
+  "data_version": "338db7ed8d",
   "data": [
     "data/calibration.json",
     "data/embeddings.bin",
@@ -51,8 +51,6 @@
     "thumbs/img_0069_l.webp",
     "thumbs/img_0071.webp",
     "thumbs/img_0071_l.webp",
-    "thumbs/img_0072.webp",
-    "thumbs/img_0072_l.webp",
     "thumbs/img_0073.webp",
     "thumbs/img_0073_l.webp",
     "thumbs/img_0074.webp",
@@ -69,8 +67,6 @@
     "thumbs/img_0091_a1.webp",
     "thumbs/img_0091_a1_l.webp",
     "thumbs/img_0091_l.webp",
-    "thumbs/img_0092.webp",
-    "thumbs/img_0092_l.webp",
     "thumbs/img_0096.webp",
     "thumbs/img_0096_l.webp",
     "thumbs/img_0097.webp",
@@ -191,8 +187,6 @@
     "thumbs/img_0346_l.webp",
     "thumbs/img_0348.webp",
     "thumbs/img_0348_l.webp",
-    "thumbs/img_0353.webp",
-    "thumbs/img_0353_l.webp",
     "thumbs/img_0354.webp",
     "thumbs/img_0354_l.webp",
     "thumbs/img_0355.webp",
@@ -232,9 +226,7 @@
     "thumbs/img_0410.webp",
     "thumbs/img_0410_l.webp",
     "thumbs/img_0415.webp",
-    "thumbs/img_0415_l.webp",
-    "thumbs/img_0419.webp",
-    "thumbs/img_0419_l.webp"
+    "thumbs/img_0415_l.webp"
   ],
   "shell": [
     "css/style.css",

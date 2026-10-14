@@ -65,6 +65,10 @@ export const squash = (text) => (text || '').toLowerCase().replace(/\s+/g, '');
 // 길게 누르기(기본 1초). 참여자가 실수로 열지 않게 연구자 전용 동작에 쓴다
 export function onLongPress(el, fn, ms = 1000) {
   let timer = null;
+  // 폰에서 길게 누르면 글자 선택·복사 메뉴가 떠서 누르기가 풀린다. 선택과 기본 동작을 막는다
+  el.classList.add('no-select');
+  el.addEventListener('selectstart', (e) => e.preventDefault());
+  el.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
   const cancel = () => { el.classList.remove('holding'); clearTimeout(timer); };
   el.addEventListener('pointerdown', () => {
     el.classList.add('holding');

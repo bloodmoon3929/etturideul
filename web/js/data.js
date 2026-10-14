@@ -55,6 +55,14 @@ export async function loadData() {
   return db;
 }
 
+// ── Task별로 보여 줄 게시물 ──────────────────────────────────────────
+// 게시물의 hidden_in에 지금 Task가 있으면 목록·검색·사진 검색·추천 어디에도 나오지 않는다
+// (예: Task 3용 1원 일괄 판매를 Task 1·2에서 미리 보지 않게). task-frame.js가 Task를 시작·끝낼 때 바꾼다
+let scopeTask = null;
+export const setTaskScope = (taskId) => { scopeTask = taskId; };
+export const isVisible = (post) => !(scopeTask && post.hidden_in?.includes(scopeTask));
+export const visiblePosts = () => db.posts.filter(isVisible);
+
 // ── 점수 ──────────────────────────────────────────────────────────────
 export function dotAt(matrix, row, vec) {
   let sum = 0;
@@ -92,6 +100,7 @@ export function combine(imgVec, txtVec) {
 // 쿼리 벡터로 모든 게시물의 순위를 매긴다. kind: 'text' | 'image' | 'image_text'
 export function rankByVector(vec, kind) {
   return db.posts.map((post, i) => {
+    if (!isVisible(post)) return null;
     const raw = dotAt(db.emb.combined, i, vec);
     const score = calibrate(kind, raw);
     return {
@@ -99,12 +108,12 @@ export function rankByVector(vec, kind) {
       // 추천 근거 패널용: 쿼리와 게시물 사진 / 게시물 글 각각의 유사도
       sim_img: dotAt(db.emb.img, i, vec), sim_txt: dotAt(db.emb.txt, i, vec),
     };
-  }).sort((a, b) => b.raw - a.raw);
+  }).filter(Boolean).sort((a, b) => b.raw - a.raw);
 }
 
 // 미리 계산한 비슷한 게시물 (모델 불필요)
 export function similarPosts(postId) {
-  return (db.similar[postId] || []).map((n) => {
+  return (db.similar[postId] || []).filter((n) => isVisible(db.byId.get(n.id))).map((n) => {
     const score = calibrate('post', n.s);
     return { post: db.byId.get(n.id), raw: n.s, score, tier: tierOf(score), sim_img: n.si, sim_txt: n.st };
   });
@@ -140,6 +149,7 @@ export function keywordSearch({ query = '', category = null, minPrice = null, ma
   const whole = squash(query);
   const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
   const results = db.posts.filter((p) => {
+    if (!isVisible(p)) return false;
     if (category && p.category !== category) return false;
     if (minPrice != null && p.price < minPrice) return false;
     if (maxPrice != null && p.price > maxPrice) return false;
@@ -169,7 +179,7 @@ export function recommendFromLikes(likedIds, n = 8, offset = 0) {
   const likedSet = new Set(likedIds);
   return db.posts
     .map((post, i) => ({ post, i, score: dotAt(db.emb.combined, i, taste) }))
-    .filter((it) => !likedSet.has(it.post.id))
+    .filter((it) => !likedSet.has(it.post.id) && isVisible(it.post))
     .sort((a, b) => b.score - a.score)
     .slice(offset, offset + n)
     .map(({ post, i, score }) => {

@@ -3,7 +3,7 @@
 // Task 사이에는 연구자 콘솔을 거치지 않고 "다음 Task" 안내 화면(taskIntroScreen)으로 이어진다.
 // 모듈(A~E)은 여기서 열리고, 정답·찜 같은 Task 상태는 task 객체가 갖는다.
 
-import { db, realPrice } from './data.js';
+import { db, realPrice, visiblePosts, setTaskScope } from './data.js';
 import { logger } from './logger.js';
 import { nav } from './nav.js';
 import { h, won, formatDuration, squash, onLongPress } from './util.js';
@@ -64,7 +64,7 @@ export const task = {
   // 무엇을 골랐는지와 참고용 가격만 남긴다
   cheapestAnswer(post) {
     const key = this.target?.product_key;
-    const prices = db.posts.map((p) => realPrice(p, key)).filter((v) => v != null);
+    const prices = visiblePosts().map((p) => realPrice(p, key)).filter((v) => v != null);
     return {
       post_id: post.id, product_key: post.product_key,
       same_product: post.product_key === key,          // 대상 상품만 파는 게시물인가
@@ -252,6 +252,7 @@ export async function startTask(run, { demo = false, onEnd = null, resumed = fal
   });
   instructionOpen = true;
   autoCollapsed = false;
+  setTaskScope(demo ? null : run.task_id);
   if (!demo && !resumed) await logger.beginRun(run);
   if (def.time_limit_s) {
     task.timer = { limitMs: def.time_limit_s * 1000, startedMs: run.started_ms ?? Date.now(), notified: false };
@@ -339,6 +340,7 @@ async function finish(outcome, answer, extra = {}) {
   clearInterval(task.timer?.interval);
   nav.closeOverlays();
   hideFrame();
+  setTaskScope(null);
   if (!demo) await logger.endRun(outcome, answer, extra);
   Object.assign(task, { run: null, def: null, target: null, timer: null, onEnd: null, demo: false });
   onEnd?.({ run, def, outcome, answer });

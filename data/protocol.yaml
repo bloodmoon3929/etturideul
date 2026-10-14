@@ -1,6 +1,6 @@
 # 인터뷰 Task 정의. build_index.py가 이 파일을 web/data/protocol.json으로 바꿔 앱에 넣는다.
 # 문구나 대상을 바꾸면 version을 올린다(로그의 protocol_version으로 남는다).
-version: p4
+version: p5
 
 # Task는 네 개이고 순서는 고정이다. 1~3은 같은 일(사진 속 굿즈를 가장 싸게 살 수 있는 게시물 고르기)을
 # 다른 화면으로 한다. 2와 3은 원래 방식 화면에 기능을 하나씩만 더해, 기능마다 따로 볼 수 있게 했다.
@@ -15,6 +15,7 @@ version: p4
 #   recommend      굿즈 n_likes개를 찜한 뒤 [구매 추천 보기] → 추천 페이지([추천 더 보기]로 유사도 순서대로 더 불러옴)
 # modules: 여는 화면 (A 원래 방식, P 원래 방식 + 사진 검색, W 원래 방식 + 가격 확인 안내, R 구매 추천)
 # condition_label: 화면 위 칩에 쓸 이름
+# initial_query: 이 검색어로 이미 검색한 결과 목록에서 시작한다(검색어를 입력하는 과정은 Task 1과 같으므로)
 tasks:
   T1:
     type: find_cheapest
@@ -34,8 +35,9 @@ tasks:
     type: find_cheapest
     name: 가격 안내와 함께 찾기
     condition_label: 가격 확인
-    instruction: "이번에는 판매가와 게시물 글에 적힌 가격이 다르면 [⚠ 가격 확인]으로 알려 줍니다. 아래 사진 속 굿즈를 가장 싸게 살 수 있다고 생각하는 게시물을 골라 [이걸로 살래요]를 누르고 [완료]를 눌러 주세요."
+    instruction: "이번에는 판매가와 게시물 글에 적힌 가격이 다르면 [⚠ 가격 확인]으로 알려 줍니다. '건담'으로 검색한 결과가 열려 있습니다. 아래 사진 속 굿즈를 가장 싸게 살 수 있다고 생각하는 게시물을 골라 [이걸로 살래요]를 누르고 [완료]를 눌러 주세요."
     modules: {ai: W}
+    initial_query: 건담
     show_card_image: true
   T4:
     type: recommend

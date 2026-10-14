@@ -361,3 +361,7 @@ a.link-btn { display: inline-flex; align-items: center; text-decoration: none; }
 .test-start small { font-size: 12px; color: var(--sub); text-align: center; }
 .test-badge { margin-left: 6px; vertical-align: middle; }
 .recommend-list { display: flex; flex-direction: column; gap: var(--gap); }
+
+/* 길게 누르는 연구자 전용 버튼과 그 화면: 글자 선택·복사 메뉴가 뜨지 않게 */
+.no-select, .handback, .resume-prompt { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.no-select { touch-action: none; }

@@ -17,7 +17,9 @@ const SORTS = [['latest', '최신순'], ['price', '낮은 가격순']];
 
 function searchScreen({ photoSearch = false, priceCheck = false } = {}) {
   const prefix = photoSearch ? 'p' : priceCheck ? 'w' : 'a';
-  const state = { query: '', category: null, minPrice: null, maxPrice: null, sort: 'latest' };
+  // Task 정의에 initial_query가 있으면 그 검색어로 이미 검색한 결과 목록에서 시작한다
+  const initialQuery = task.def?.initial_query ?? '';
+  const state = { query: initialQuery, category: null, minPrice: null, maxPrice: null, sort: 'latest' };
   let searchNo = 0;
   let typing = false;
   let photo = null;       // 사진 검색 중이면 { file, objectUrl, source, meta }
@@ -97,7 +99,7 @@ function searchScreen({ photoSearch = false, priceCheck = false } = {}) {
     nav.push(detailScreen(item, { screenId: `${prefix}_detail`, from: `${prefix}_results`, rank, section, chain_depth: 0, priceCheck }));
   };
 
-  // 키워드 목록. trigger: submit(검색 버튼) / category / filter / sort / initial(처음 화면, 기록하지 않음)
+  // 키워드 목록. trigger: submit(검색 버튼) / category / filter / sort / preset(initial_query로 시작한 목록) / initial(처음 화면, 기록하지 않음)
   function run(trigger) {
     const t0 = performance.now();
     const items = keywordSearch(state).map((post) => ({ post }));
@@ -183,8 +185,19 @@ function searchScreen({ photoSearch = false, priceCheck = false } = {}) {
   }
 
   const el = h('div', { class: 'module' }, h('div', { class: 'module-head' }, form, photoChip, filters), count, list);
+  if (initialQuery) {
+    input.value = initialQuery;
+    clearBtn.hidden = false;
+  }
   run('initial');
-  return { id: `${prefix}_results`, el, onDestroy: () => { unsubscribe(); setPhoto(null); } };
+  let shownOnce = false;
+  // 미리 검색해 둔 목록은 화면이 뜬 뒤에 기록해야 screen 값이 이 화면으로 남는다
+  const onShow = () => {
+    if (shownOnce) return;
+    shownOnce = true;
+    if (initialQuery) run('preset');
+  };
+  return { id: `${prefix}_results`, el, onShow, onDestroy: () => { unsubscribe(); setPhoto(null); } };
 }
 
 export const rootScreen = () => searchScreen();

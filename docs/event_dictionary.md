@@ -89,7 +89,7 @@ Task 정의에 `ask_min_price: true`를 넣으면 찾기 Task가 끝날 때 최�
 |---|---|
 | `search_id` | `<task_run_id>-s<번호>` |
 | `mode` | `keyword`(글로 검색. T1, T2 공통) / `ai_photo`(사진 검색. T2). `ai_text`, `ai_photo_text`는 데모 화면에서만 나온다 |
-| `trigger` | `submit`(검색 실행) / `category` / `filter` / `sort`. 검색 횟수를 셀 때는 `submit`만 센다 |
+| `trigger` | `submit`(검색 실행) / `category` / `filter` / `sort` / `preset`(Task 정의의 initial_query로 미리 검색해 둔 목록. T3 시작 화면). 검색 횟수를 셀 때는 `submit`만 센다 |
 | `query` | 검색어 |
 | `filters` | `{category, min_price, max_price}` (모듈 B는 null) |
 | `sort` | `latest` / `price` / `similarity` |
@@ -101,6 +101,8 @@ Task 정의에 `ask_min_price: true`를 넣으면 찾기 Task가 끝날 때 최�
 | `backend` | `browser` / `server` (모듈 B) |
 
 가상 갤러리: Task 중 사진은 앱 안의 갤러리 화면에서 고른다(`web/js/config.js`의 `PHOTO_SOURCE = 'virtual'`). 맨 앞(가장 최근)이 그 Task의 대상 사진이고 뒤로 일상 사진이 이어진다. `photo_id`는 대상 사진이면 `card:<세트>_<Task>`, 일상 사진이면 `gal_NN`, 함께 섞어 둔 다른 굿즈 사진이면 `goods_img_NNNN`이다.
+
+게시물의 `hidden_in`에 지금 Task가 있으면 그 Task에서는 목록·검색·사진 검색·추천 어디에도 나오지 않는다(예: T3용 1원 일괄 판매는 T1·T2에서 안 보임). 결과 목록과 순위는 보이는 게시물만으로 매긴다.
 
 ## 결과·상세
 

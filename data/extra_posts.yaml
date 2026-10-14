@@ -3,8 +3,10 @@
 # Task 대상 굿즈 세 개(세이버 피그마, 리볼텍 단보, RG 건담)는 같은 구조로 여러 개 올린다.
 #   - 제목에 상품 이름이 없는 게시물("피규어 팝니다" 등): 판매가가 낮은 편. 사진 검색이 있어야 찾기 쉽다
 #   - 본문에서만 가격을 내린 게시물: 판매가는 중간인데 본문 가격이 가장 낮다. 가격 확인 안내가 있어야 알아채기 쉽다
-#   - 판매가 1원 일괄 판매: 본문에 상품별 가격이 있다
 #   - 그 밖의 일반 게시물 2~3개
+# 판매가 1원 일괄 판매는 Task 3(가격 확인 안내)의 건담에만 둔다. 앞 Task에서 1원 게시물을 먼저 보면 가격 확인 안내의 효과가 흐려지므로,
+# 그 게시물은 hidden_in으로 Task 1·2 화면에서 아예 보이지 않게 한다.
+# - hidden_in: 이 게시물을 보여 주지 않을 Task (목록·검색·사진 검색·추천 모두에서 빠진다)
 # 정답·오답은 매기지 않는다. 앱은 고른 게시물과 그 판매가·실제 가격·대상의 최저 실제 가격을 참고로 남긴다.
 # - image: 사진 id. "img_0100_a1"처럼 _aN이 붙은 것은 scripts/augment_images.py가 만든 증강 사진이다(다른 판매자가 찍은 것처럼 보이게).
 # - real_prices: 평가용 실제 가격. 본문 가격이 실제 가격인 게시물과 일괄 판매 게시물에만 적는다(없으면 판매가가 실제 가격).
@@ -15,7 +17,7 @@ overrides:
 
 posts:
   # ── 세이버 피그마 (Task 1 대상, figma-003-saber-armor) ──────────────
-  # 이름 없는 제목 img_0060 22,000원 / 본문에서만 내림 img_0062 30,000원 → 20,000원 / 일괄 판매 28,000원
+  # 이름 없는 제목 img_0060 22,000원 / 본문에서만 내림 img_0062 30,000원 → 20,000원
   - image: img_0060
     product_key: figma-003-saber-armor
     product_name: figma 003 세이버 갑옷 ver.
@@ -50,26 +52,9 @@ posts:
     price: 33000
     condition: 거의 새것
     tags: [피그마, 세이버, 페이트]
-  - image: img_0072
-    product_key: bundle-figma-p3
-    product_name: 피그마 일괄 (페르소나3 외)
-    category: 피규어
-    series: 기타
-    title: 피규어 정리합니다 일괄
-    title_style: generic
-    description: |-
-      피그마 정리합니다. 가격은 본문 보시고 연락 주세요.
-      피그마 메티스 25,000원
-      피그마 아이기스 22,000원
-      코로마루 8,000원
-      피그마 세이버 갑옷 버전 28,000원 (사진에는 없어요)
-    price: 1
-    real_prices: {figma-003-saber-armor: 28000}
-    condition: 사용감 있음
-    tags: [피그마, 일괄]
 
   # ── 리볼텍 단보 아마존 박스 버전 (Task 2 대상, revoltech-danboard-amazon) ─
-  # 이름 없는 제목 img_0100_a1 19,000원 / 본문에서만 내림 img_0091_a1 27,000원 → 17,000원 / 일괄 판매 24,000원
+  # 이름 없는 제목 img_0100_a1 19,000원 / 본문에서만 내림 img_0091_a1 27,000원 → 17,000원
   - image: img_0100_a1
     product_key: revoltech-danboard-amazon
     product_name: 리볼텍 단보 Amazon.co.jp 박스 ver.
@@ -104,25 +89,9 @@ posts:
     price: 32000
     condition: 거의 새것
     tags: [단보, 아마존]
-  - image: img_0092
-    product_key: bundle-danbo-set
-    product_name: 단보 일괄 (큰 단보 + 미니 단보)
-    category: 피규어
-    series: 요츠바랑!
-    title: 단보 일괄 판매
-    title_style: char_only
-    description: |-
-      단보 정리합니다. 가격은 본문 보시고 연락 주세요.
-      큰 단보 (아마존 박스) 24,000원
-      미니 단보 1개 9,000원
-      한꺼번에 가져가시면 45,000원
-    price: 1
-    real_prices: {revoltech-danboard-amazon: 24000}
-    condition: 사용감 있음
-    tags: [단보, 일괄]
 
   # ── RG RX-78-2 건담 (Task 3 대상, rg-rx-78-2-gundam) ─────────────────
-  # 이름 없는 제목 img_0190 19,000원(아래) / 본문에서만 내림 img_0191_a1 24,000원 → 17,000원 / 일괄 판매 21,000원
+  # 이름 없는 제목 img_0190 19,000원(아래) / 본문에서만 내림 img_0191_a1 24,000원 → 17,000원 / 일괄 판매(1원) 21,000원 — Task 3에서만 보임
   # 그 밖: img_0191 22,000원, img_0199 26,000원 (draft_curation.json). img_0198은 Task 대상 사진이라 게시물에서 빠진다
   - image: img_0191_a1
     product_key: rg-rx-78-2-gundam
@@ -141,7 +110,7 @@ posts:
     product_name: 퍼스트 건담 일괄 (RG + HG)
     category: 프라모델
     series: 건담
-    title: 건프라 정리합니다 일괄
+    title: 건담 프라모델 정리합니다 일괄
     title_style: generic
     description: |-
       건프라 정리합니다. 가격은 본문 보시고 연락 주세요.
@@ -150,10 +119,11 @@ posts:
       둘 다 하시면 30,000원
     price: 1
     real_prices: {rg-rx-78-2-gundam: 21000}
+    hidden_in: [T1, T2]
     condition: 박스 없음
-    tags: [건프라, 일괄]
+    tags: [건담, 건프라, 일괄]
 
-  # ── 그 밖의 이름 없는 제목·일괄 판매 ──────────────────────────────────
+  # ── 그 밖의 이름 없는 제목 ────────────────────────────────────────────
   - image: img_0354
     product_key: totoro-plush-large-shop
     product_name: 이웃집 토토로 큰 토토로 봉제인형
@@ -176,34 +146,3 @@ posts:
     price: 19000
     condition: 박스 없음
     tags: [프라모델, 완성품]
-  - image: img_0419
-    product_key: bundle-dog-plush
-    product_name: 강아지 인형 일괄
-    category: 인형
-    series: 기타
-    title: 인형 일괄 판매
-    title_style: generic
-    description: |-
-      강아지 인형들 정리해요. 가격은 본문 참고해 주세요.
-      분홍 강아지 인형 12,000원
-      누워 있는 시바 인형 15,000원
-      하얀 강아지 인형 10,000원
-      세 개 다 하시면 32,000원
-    price: 1
-    condition: 거의 새것
-    tags: [인형, 일괄]
-  - image: img_0353
-    product_key: bundle-totoro-plush
-    product_name: 토토로 인형 일괄
-    category: 인형
-    series: 이웃집 토토로
-    title: 토토로 인형 여러 개 팝니다
-    title_style: char_only
-    description: |-
-      토토로 인형 여러 개 있어요. 사진에 있는 것 중 고르시면 됩니다.
-      큰 토토로 20,000원
-      중간 토토로 13,000원
-      작은 토토로 8,000원
-    price: 1
-    condition: 사용감 있음
-    tags: [토토로, 인형, 일괄]

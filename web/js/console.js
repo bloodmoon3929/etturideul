@@ -144,7 +144,7 @@ export function showResumePrompt(session) {
   const finished = session.task_runs.filter((r) => r.status === 'done' || r.status === 'skipped').length;
   const hold = h('button', { class: 'btn ghost hold-btn', type: 'button' }, '연구자 전용 · 길게 눌러 콘솔 열기');
   onLongPress(hold, showConsole);
-  const el = h('div', { class: 'module center-col' },
+  const el = h('div', { class: 'module center-col resume-prompt' },
     h('h2', null, '진행하던 세션이 있습니다'),
     h('p', { class: 'hint center' }, `${session.participant} · Task ${session.task_runs.length}개 중 ${finished}개 끝남 · ${session.started_at.slice(0, 16).replace('T', ' ')} 시작`),
     h('button', { class: 'btn primary big', type: 'button', onclick: continueSession }, '이어서 진행'),

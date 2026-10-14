@@ -116,6 +116,8 @@ def main() -> None:
             "augmented": "_a" in e["image_id"],
             # 판매가와 실제 가격이 다른 게시물(본문에서만 가격을 바꿈, 일괄 판매)의 실제 가격. 평가에만 쓴다
             **({"real_prices": e["real_prices"]} if e.get("real_prices") else {}),
+            # 보여 주지 않을 Task (앞 Task에서 미리 보면 안 되는 게시물)
+            **({"hidden_in": e["hidden_in"]} if e.get("hidden_in") else {}),
             "location": rng.choice(LOCATIONS),
             "seller": f"{rng.choice(SELLER_WORDS)}{rng.randint(10, 99)}",
             "created_at": (BASE_DATE - timedelta(days=rng.randint(0, 29))).isoformat(),
