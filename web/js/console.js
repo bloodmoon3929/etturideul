@@ -49,6 +49,14 @@ export function buildPlan(participant, orderGroup) {
   return runs;
 }
 
+// 파일로 저장하지 않은 마지막 번호의 세션을 지우면 그 번호를 다음 세션에서 다시 쓴다(잘못 시작한 세션 등).
+// 파일로 저장한 세션은 실제 기록일 수 있으므로 번호를 되돌리지 않는다(같은 번호가 두 번 생기지 않게)
+async function numberReusable(session) {
+  if (session.exported_at) return false;
+  const key = session.test ? 'last_test_no' : 'last_participant_no';
+  return (await kv.get(key, 0)) === participantNo(session.participant);
+}
+
 // ── 세션 흐름 ─────────────────────────────────────────────────────────
 export function showConsole() {
   nav.reset(consoleScreen());
@@ -433,9 +441,14 @@ function consoleScreen() {
             render();
           } }, '업로드') : null,
           h('button', { class: 'btn small ghost', type: 'button', onclick: async () => {
+            const reuse = await numberReusable(s);
             const message = s.exported_at ? '이 세션의 기기 안 기록을 지울까요? (파일로 저장한 것은 그대로 남습니다)'
-              : '아직 파일로 저장하지 않은 세션입니다. 지우면 기록을 되찾을 수 없습니다. 그래도 지울까요?';
-            if (await confirmDialog(message, { ok: '지우기', danger: true })) { await deleteSession(s.session_id); render(); }
+              : `아직 파일로 저장하지 않은 세션입니다. 지우면 기록을 되찾을 수 없습니다.${reuse ? ` 지우면 다음 세션 번호가 다시 ${s.participant}부터 시작합니다.` : ''} 그래도 지울까요?`;
+            if (await confirmDialog(message, { ok: '지우기', danger: true })) {
+              await deleteSession(s.session_id);
+              if (reuse) await kv.set(s.test ? 'last_test_no' : 'last_participant_no', participantNo(s.participant) - 1);
+              render();
+            }
           } }, '지우기')));
     }));
     return h('section', { class: 'console-section' }, h('h3', null, `저장 대기 ${ended.length}건`), cards);
