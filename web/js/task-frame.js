@@ -19,7 +19,7 @@ const MODULES = {
   D: () => import('./mod-d-ai-listing.js'),
   E: () => import('./graph.js'),
 };
-// 인터뷰에서 쓰는 화면은 A, P, R이다. 나머지(B~E)는 데모에서만 열 수 있다
+// 인터뷰에서 쓰는 화면은 A, P, R이다. 나머지(B~E)는 코드만 남아 있다(콘솔에서 열 수 없음)
 export const MODULE_NAMES = {
   A: '원래 방식 검색', P: '사진 검색 (제안 방식)', R: '비슷한 굿즈 추천',
   B: 'AI 글·사진 검색', C: '기존 방식 판매 등록', D: 'AI 판매 등록', E: '3D 취향 지도',

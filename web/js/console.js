@@ -2,18 +2,18 @@
 // 참여자가 폰을 받은 뒤에는 콘솔을 거치지 않는다. 동의 → Task 안내 → Task → … → 마지막 질문까지 이어지고(advance),
 // 모두 끝난 뒤 "휴대폰 돌려주기" 화면에서만 여기로 돌아온다. 중간에 열어야 하면 Task 안내 화면의 Task 번호를 길게 누른다.
 
-import { APP_VERSION, SERVICE_NAME, PRESETS, UPLOAD_BACKEND, SURVEYS, url, MODEL_IDS } from './config.js';
+import { APP_VERSION, SERVICE_NAME, PRESETS, UPLOAD_BACKEND, SURVEYS, PHOTO_SOURCE, SERVER_API_BASE, url, MODEL_IDS } from './config.js';
 import { db, settings, saveSettings, thumbUrl } from './data.js';
 import { logger } from './logger.js';
 import { ml } from './ml.js';
 import { nav } from './nav.js';
 import { kv, sessions, photos, deleteSession, events } from './store.js';
-import { startTask, taskIntroScreen, MODULE_NAMES } from './task-frame.js';
+import { startTask, taskIntroScreen } from './task-frame.js';
 import { consentScreen, preSurveyScreen, postTaskSurveyScreen, finalSurveyScreen, handBackScreen } from './survey.js';
 import { uploadSession, exportSessionJson, exportPhotosZip } from './uploader.js';
 import { startReplay, stopReplay } from './replay.js';
 import { h, formatDuration, onLongPress } from './util.js';
-import { toast, confirmDialog, screenHeader } from './ui.js';
+import { toast, confirmDialog, screenHeader, sheet } from './ui.js';
 
 const CONDITION_LABEL = { classic: '원래 방식', ai: '제안 방식' };
 const STATUS_LABEL = { pending: '대기', running: '진행 중', done: '완료', give_up: '포기', skipped: '건너뜀' };
@@ -149,7 +149,7 @@ async function endSession(render) {
     await deleteSession(id);
     toast(`업로드 완료 (이벤트 ${result.n_events}건)`);
   } else {
-    toast(UPLOAD_BACKEND === 'none' ? '세션을 종료했어요. [JSON 파일로 저장]으로 꺼내 주세요' : '업로드에 실패해 대기 상태로 두었어요', 4000);
+    toast(UPLOAD_BACKEND === 'none' ? '세션을 종료했어요. 아래 저장 대기에서 [JSON 저장]을 눌러 주세요' : '업로드에 실패해 대기 상태로 두었어요', 4000);
   }
   render();
 }
@@ -183,7 +183,7 @@ async function readiness() {
     { label: '썸네일', ok: thumbs === m.thumbs.length, detail: `${thumbs}/${m.thumbs.length}` },
     { label: '텍스트 모델', ok: text && ml.isReady('text'), detail: ml.isReady('text') ? '로드됨' : text ? '캐시됨' : '없음' },
     { label: '이미지 모델', ok: vision && ml.isReady('vision'), detail: ml.isReady('vision') ? '로드됨' : vision ? '캐시됨' : '없음' },
-    { label: '저장 공간 보호', ok: persisted, detail: persisted ? '적용됨' : '미적용(브라우저가 지울 수 있음)' },
+    { key: 'persist', label: '저장 공간 보호', ok: persisted, detail: persisted ? '적용됨' : '미적용 (브라우저가 지울 수 있음)' },
   ];
 }
 
@@ -227,204 +227,287 @@ function sourcesScreen() {
 }
 
 // ── 콘솔 화면 ─────────────────────────────────────────────────────────
+// 위: 상태 요약(AI 모델 · 오프라인 준비 · 저장 대기)  가운데: 새 세션 또는 진행 중인 세션  아래: 저장 대기 목록, 도구(접힘)
+const PRESET_LABEL = { q8: 'q8 · 모든 기기 (기본)', mixed: '이미지 fp16 · WebGPU + 텍스트 q8', fp16: 'fp16 · WebGPU' };
+const STEP_ICON = { done: '✓', skipped: '–', give_up: '–', running: '●' };
+
 function consoleScreen() {
   const el = h('div', { class: 'module console' });
-  const status = h('p', { class: 'hint' });
   let alive = true;
-  let refreshOffline = null;   // 오프라인 준비 목록만 다시 그리는 함수
 
-  const section = (title, ...children) => h('section', { class: 'panel' }, h('h3', null, title), children);
-
-  function statusLine() {
-    const part = (which, name) => {
-      const m = ml.models[which];
-      return `${name} ${m ? `${m.device}/${m.dtype}` : ml.loading[which] ? '로드 중…' : '대기'}`;
+  // ── 상태 요약 타일. 화면 전체를 다시 그리지 않고 타일만 고친다(입력 중이던 값이 지워지지 않게) ──
+  const tile = (label) => {
+    const value = h('div', { class: 'tile-value' });
+    const sub = h('div', { class: 'tile-sub' });
+    const bar = h('div', { class: 'tile-bar', hidden: true }, h('i'));
+    const node = h('div', { class: 'tile' }, h('div', { class: 'tile-label' }, label), value, sub, bar);
+    return {
+      node,
+      set(text, tone, detail = '', percent = null) {
+        node.dataset.tone = tone;
+        value.textContent = text;
+        sub.textContent = detail;
+        bar.hidden = percent == null;
+        if (percent != null) bar.firstChild.style.width = `${percent}%`;
+      },
     };
-    return `${part('text', '텍스트')} · ${part('vision', '이미지')} · 검색 ${settings.searchBackend === 'server' ? '서버' : '기기'} · ${navigator.onLine ? '온라인' : '오프라인'}`;
+  };
+  const modelTile = tile('AI 모델');
+  const offlineTile = tile('오프라인 준비');
+  offlineTile.node.addEventListener('click', () => {   // 준비가 안 됐으면 눌러서 도구의 준비 버튼으로 간다
+    if (!offlineTile.node.classList.contains('clickable')) return;
+    const tools = el.querySelector('details.tools');
+    tools.open = true;
+    prepareBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  const pendingTile = tile('저장 대기');
+  const onlinePill = h('span', { class: 'pill' });
+  let download = null;   // 모델을 받는 중이면 { which, percent }
+
+  function updateModelTile() {
+    const ready = ['text', 'vision'].filter((w) => ml.isReady(w)).length;
+    if (ready === 2) {
+      const [t, v] = ['text', 'vision'].map((w) => `${ml.models[w].device}/${ml.models[w].dtype}`);
+      return modelTile.set('준비됨', 'ok', t === v ? `텍스트·이미지 ${t}` : `텍스트 ${t} · 이미지 ${v}`);
+    }
+    if (download) return modelTile.set(`받는 중 ${download.percent}%`, 'busy', download.which === 'text' ? '텍스트 모델' : '이미지 모델', download.percent);
+    modelTile.set(ready ? '1/2 준비' : '불러오는 중', 'busy', ready ? '이미지 모델을 불러오는 중' : '');
+  }
+  function updateOnline() {
+    onlinePill.textContent = navigator.onLine ? '온라인' : '오프라인';
+    onlinePill.dataset.tone = navigator.onLine ? 'ok' : 'warn';
   }
 
-  async function newSessionPanel() {
+  let preparing = false;
+  async function updateOfflineTile() {
+    if (preparing) return;
+    const items = await readiness();
+    const missing = items.filter((it) => !it.ok && it.key !== 'persist');
+    if (!missing.length) offlineTile.set('준비 완료', 'ok', '신호가 없어도 진행할 수 있어요');
+    else offlineTile.set('준비 필요', 'warn', missing.map((it) => it.label).join(', '));
+    offlineTile.node.classList.toggle('clickable', missing.length > 0);
+    offlineList.replaceChildren(...items.map((it) => h('li', { class: it.ok ? 'ok' : 'no' },
+      h('span', { class: 'check-mark' }, it.ok ? '✓' : '·'), h('span', null, it.label), h('small', null, it.detail))));
+    prepareBtn.hidden = !missing.length;
+  }
+  const offlineList = h('ul', { class: 'check-list' });
+  const prepareBtn = h('button', { class: 'btn small', type: 'button', onclick: async () => {
+    preparing = true;
+    prepareBtn.disabled = true;
+    try {
+      await prepareOffline((text) => offlineTile.set('준비 중', 'busy', text));
+    } catch (err) {
+      toast(`준비 실패: ${err.message || err}`);
+    }
+    preparing = false;
+    prepareBtn.disabled = false;
+    updateOfflineTile();
+  } }, '지금 준비하기');
+
+  // ── 새 세션 ─────────────────────────────────────────────────────────
+  async function newSessionCard() {
     const next = (await kv.get('last_participant_no', 0)) + 1;
-    const participant = h('input', { class: 'input', value: `P${String(next).padStart(2, '0')}`, 'aria-label': '참여자 번호' });
+    const participant = h('input', { class: 'input big-input', value: `P${String(next).padStart(2, '0')}`, 'aria-label': '참여자 번호', autocomplete: 'off' });
     const group = h('select', { class: 'input', 'aria-label': '순서 그룹' });
     const fixedOrder = !!db.protocol.sequence.runs;   // 순서가 고정이면 순서 그룹을 고르지 않는다
-    group.hidden = fixedOrder;
     const fillGroups = () => {
       if (fixedOrder) return;
       const auto = autoGroup(participant.value);
       group.replaceChildren(...Object.entries(db.protocol.order_groups).map(([id, g]) => h('option', { value: id, selected: Number(id) === auto },
-        `그룹 ${id}: ${g.conditions.map((c) => CONDITION_LABEL[c]).join(' → ')}, 세트 ${g.sets.join(' → ')}${Number(id) === auto ? ' (자동)' : ''}`)));
+        `그룹 ${id}: ${g.conditions.map((c) => CONDITION_LABEL[c]).join(' → ')}${Number(id) === auto ? ' (자동)' : ''}`)));
     };
     participant.oninput = fillGroups;
     fillGroups();
-    const note = h('input', { class: 'input', placeholder: '장소 메모 (예: 카페)', 'aria-label': '장소 메모' });
-    return section('새 세션',
-      h('div', { class: 'stack' }, participant, group, note,
-        h('button', { class: 'btn primary', type: 'button', onclick: () => {
-          const p = participant.value.trim().toUpperCase();
-          if (!/^P\d+$/.test(p)) return toast('참여자 번호는 P01 형식으로 적어 주세요');
-          startSession({ participant: p, orderGroup: fixedOrder ? null : Number(group.value), locationNote: note.value.trim() });
-        } }, '세션 시작 · 참여자에게 건네기')));
+    const note = h('input', { class: 'input', placeholder: '장소 메모 (선택, 예: 카페)', 'aria-label': '장소 메모' });
+    const taskNames = db.protocol.sequence.runs?.map((r) => db.protocol.tasks[r.task]?.name).filter(Boolean) ?? [];
+    return h('section', { class: 'card-main' },
+      h('h2', null, '새 세션'),
+      taskNames.length ? h('p', { class: 'hint' }, `Task ${taskNames.length}개: ${taskNames.join(' → ')}`) : null,
+      h('div', { class: 'field-grid' },
+        h('label', { class: 'field' }, h('span', null, '참여자 번호'), participant),
+        h('label', { class: 'field' }, h('span', null, '장소'), note)),
+      fixedOrder ? null : h('label', { class: 'field' }, h('span', null, '순서 그룹'), group),
+      h('button', { class: 'btn primary big block', type: 'button', onclick: () => {
+        const p = participant.value.trim().toUpperCase();
+        if (!/^P\d+$/.test(p)) return toast('참여자 번호는 P01 형식으로 적어 주세요');
+        startSession({ participant: p, orderGroup: fixedOrder ? null : Number(group.value), locationNote: note.value.trim() });
+      } }, '세션 시작'),
+      h('p', { class: 'hint center' }, '누르면 동의 화면이 열립니다. 그대로 참여자에게 건네주세요.'));
   }
 
-  function activeSessionPanel(s) {
+  // ── 진행 중인 세션 ──────────────────────────────────────────────────
+  function activeSessionCard(s) {
     const next = s.task_runs.find((r) => r.status === 'pending');
     const running = s.task_runs.find((r) => r.status === 'running');
     const finalDone = s.surveys.some((x) => x.scope === 'session');
     const beforeConsent = s.step === 'consent' || s.step === 'pre';
-    const continueLabel = running ? `이어서 진행: ${running.task_id} Task 처음부터 다시`
-      : beforeConsent ? '이어서 진행: 동의 화면부터'
-        : next ? `이어서 진행: ${next.task_id} (${CONDITION_LABEL[next.condition]})부터` : '이어서 진행: 마지막 질문';
-    const rows = s.task_runs.map((r) => {
+    const continueLabel = running ? `${running.task_id} 다시 시작` : beforeConsent ? '동의 화면부터' : next ? `${next.task_id}부터` : '마지막 질문';
+    const finished = s.task_runs.filter((r) => r.status !== 'pending' && r.status !== 'running').length;
+    const steps = s.task_runs.map((r) => {
       const def = db.protocol.tasks[r.task_id];
       const correct = r.answer?.is_correct;
-      return h('div', { class: `run-row ${r.status}` },
-        h('span', { class: 'run-no' }, r.order_index),
-        h('span', { class: 'run-name' }, `${r.task_id} ${def?.name ?? ''}`,
-          h('small', null, ` ${CONDITION_LABEL[r.condition] ?? ''}`)),
-        h('span', { class: 'run-status' }, STATUS_LABEL[r.status], correct === true ? ' ○' : correct === false ? ' ✕' : ''),
-        r === next ? h('button', { class: 'link-btn', type: 'button', onclick: async () => {
-          if (await confirmDialog(`${r.task_id} Task를 건너뛸까요?`, { ok: '건너뛰기' })) { await logger.skipRun(r); render(); }
+      return h('li', { class: `step ${r.status}` },
+        h('span', { class: 'step-dot' }, STEP_ICON[r.status] ?? r.order_index),
+        h('div', { class: 'step-body' },
+          h('div', { class: 'step-title' }, `${r.task_id} ${def?.name ?? ''}`),
+          h('div', { class: 'step-meta' },
+            CONDITION_LABEL[r.condition] ? h('span', { class: `cond-chip ${r.condition}` }, CONDITION_LABEL[r.condition]) : null,
+            ` ${STATUS_LABEL[r.status]}`,
+            correct === true ? h('span', { class: 'badge ok' }, '정답') : correct === false ? h('span', { class: 'badge no' }, '오답') : null,
+            r.answer?.liked ? h('span', { class: 'badge' }, `찜 ${r.answer.liked.length}`) : null)),
+        r === next && !running ? h('button', { class: 'link-btn small', type: 'button', onclick: async () => {
+          if (await confirmDialog(`${r.task_id}을(를) 건너뛸까요?`, { ok: '건너뛰기' })) { await logger.skipRun(r); render(); }
         } }, '건너뛰기') : null);
     });
-    const noteInput = h('textarea', { class: 'input', rows: 2, placeholder: '관찰 메모 (시각이 함께 저장됩니다)' });
-    const lastRun = [...s.task_runs].reverse().find((r) => r.status !== 'pending');
-    return section(`진행 중: ${s.participant}${s.order_group ? ` · 그룹 ${s.order_group}` : ''} · ${formatDuration(Date.now() - s.started_ms)} 경과`,
-      h('div', { class: 'run-list' }, rows),
-      !finalDone || running ? h('button', { class: 'btn primary block', type: 'button', onclick: continueSession }, `${continueLabel} · 참여자에게 건네기`) : null,
-      finalDone && !running ? h('p', { class: 'hint' }, '모든 Task와 마지막 질문이 끝났습니다. 세션을 종료해 주세요.') : null,
-      h('p', { class: 'hint' }, '이 세션을 그만두고 새로 시작하려면 아래 [세션 종료]를 누릅니다. 기록은 지워지지 않고 "저장 대기"로 옮겨집니다.'),
-      h('div', { class: 'stack' }, noteInput,
-        h('button', { class: 'btn', type: 'button', onclick: async () => {
-          if (!noteInput.value.trim()) return;
-          await logger.addNote(noteInput.value.trim(), lastRun?.task_run_id ?? null);
-          render();
-        } }, '메모 추가')),
-      s.notes.length ? h('ul', { class: 'note-list' }, s.notes.map((n) => h('li', null, h('small', null, `${n.ts.slice(11, 19)} ${n.task_run_id ?? ''}`), ` ${n.text}`))) : null,
-      h('button', { class: 'btn danger block', type: 'button', onclick: () => endSession(render) }, '세션 종료'));
+    return h('section', { class: 'card-main' },
+      h('div', { class: 'session-head' },
+        h('div', null,
+          h('div', { class: 'eyebrow' }, '진행 중인 세션'),
+          h('h2', null, s.participant, s.order_group ? h('small', null, ` 그룹 ${s.order_group}`) : null)),
+        h('div', { class: 'session-time' }, h('b', null, formatDuration(Date.now() - s.started_ms)), h('small', null, `${finished}/${s.task_runs.length} 끝남`))),
+      h('ol', { class: 'steps' }, steps),
+      !finalDone || running
+        ? h('button', { class: 'btn primary big block', type: 'button', onclick: continueSession }, `이어서 진행 · ${continueLabel}`)
+        : h('p', { class: 'done-note' }, '✓ 모든 Task와 마지막 질문이 끝났습니다. 세션을 종료하고 저장해 주세요.'),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn', type: 'button', onclick: () => openNotes(s) }, `관찰 메모${s.notes.length ? ` ${s.notes.length}` : ''}`),
+        h('button', { class: 'btn danger', type: 'button', onclick: () => endSession(render) }, '세션 종료')));
   }
 
-  async function pendingPanel() {
-    const ended = (await sessions.all()).filter((s) => s.status !== 'active');
-    if (!ended.length) return section('저장 대기', h('p', { class: 'hint' }, '대기 중인 세션이 없습니다 (0건).'));
-    const rows = await Promise.all(ended.map(async (s) => {
+  // 관찰 메모: 시트에서 적고, 지금까지 적은 메모를 함께 본다
+  function openNotes(s) {
+    const lastRun = [...s.task_runs].reverse().find((r) => r.status !== 'pending');
+    const input = h('textarea', { class: 'input', rows: 3, placeholder: '관찰한 내용을 적어 주세요. 적은 시각이 함께 저장됩니다.' });
+    const list = () => (s.notes.length
+      ? h('ul', { class: 'note-list' }, [...s.notes].reverse().map((n) => h('li', null, h('small', null, `${n.ts.slice(11, 16)} ${n.task_run_id ?? ''}`), n.text)))
+      : h('p', { class: 'hint' }, '아직 메모가 없습니다.'));
+    let listNode = list();
+    sheet({
+      title: '관찰 메모',
+      content: [input,
+        h('button', { class: 'btn primary', type: 'button', onclick: async () => {
+          if (!input.value.trim()) return;
+          await logger.addNote(input.value.trim(), lastRun?.task_run_id ?? null);
+          input.value = '';
+          const fresh = list();
+          listNode.replaceWith(fresh);
+          listNode = fresh;
+          render();
+        } }, '저장'),
+        listNode],
+    });
+    input.focus();
+  }
+
+  // ── 저장 대기 ───────────────────────────────────────────────────────
+  async function pendingSection(ended) {
+    if (!ended.length) return null;
+    const cards = await Promise.all(ended.map(async (s) => {
       const n = (await events.of(s.session_id)).length;
-      return h('div', { class: 'pending-row' },
-        h('div', null, h('b', null, s.session_id), h('small', null, ` 이벤트 ${n}건 · ${s.exported_at ? '파일 저장됨' : '아직 저장 안 함'}`)),
-        h('div', { class: 'row' },
-          h('button', { class: 'btn', type: 'button', onclick: async () => {
+      return h('div', { class: 'pending-card' },
+        h('div', { class: 'pending-info' },
+          h('b', null, s.participant),
+          h('small', null, `${s.started_at.slice(5, 16).replace('T', ' ')} · 이벤트 ${n}건`),
+          h('span', { class: `badge ${s.exported_at ? 'ok' : 'warn'}` }, s.exported_at ? '파일 저장됨' : '저장 안 함')),
+        h('div', { class: 'pending-actions' },
+          h('button', { class: `btn small ${s.exported_at ? '' : 'primary'}`, type: 'button', onclick: async () => {
             const out = await exportSessionJson(s.session_id);
             toast(`저장했어요 (이벤트 ${out.n_events}건)`);
             render();
-          } }, 'JSON 파일로 저장'),
-          UPLOAD_BACKEND === 'firebase' ? h('button', { class: 'btn', type: 'button', onclick: async () => {
+          } }, 'JSON 저장'),
+          UPLOAD_BACKEND === 'firebase' ? h('button', { class: 'btn small', type: 'button', onclick: async () => {
             const result = await uploadSession(s.session_id);
             if (result.ok) { await deleteSession(s.session_id); toast(`업로드 완료 (이벤트 ${result.n_events}건)`); } else toast('업로드 실패. 신호를 확인해 주세요');
             render();
-          } }, '다시 업로드') : null,
-          h('button', { class: 'btn ghost', type: 'button', onclick: async () => {
+          } }, '업로드') : null,
+          h('button', { class: 'btn small ghost', type: 'button', onclick: async () => {
             const message = s.exported_at ? '이 세션의 기기 안 기록을 지울까요? (파일로 저장한 것은 그대로 남습니다)'
               : '아직 파일로 저장하지 않은 세션입니다. 지우면 기록을 되찾을 수 없습니다. 그래도 지울까요?';
             if (await confirmDialog(message, { ok: '지우기', danger: true })) { await deleteSession(s.session_id); render(); }
           } }, '지우기')));
     }));
-    return section(`저장 대기 ${ended.length}건`, rows);
+    return h('section', { class: 'console-section' }, h('h3', null, `저장 대기 ${ended.length}건`), cards);
   }
 
-  async function offlinePanel() {
-    const list = h('ul', { class: 'check-list' });
-    const progress = h('p', { class: 'hint' });
-    const refresh = async () => {
-      const items = await readiness();
-      list.replaceChildren(...items.map((it) => h('li', { class: it.ok ? 'ok' : 'no' }, `${it.ok ? '✓' : '·'} ${it.label}`, h('small', null, ` ${it.detail}`))));
-    };
-    await refresh();
-    refreshOffline = refresh;
-    return section('오프라인 준비 상태', list, progress,
-      h('button', { class: 'btn', type: 'button', onclick: async (e) => {
-        e.target.disabled = true;
-        try {
-          await prepareOffline((text) => { progress.textContent = text; });
-          progress.textContent = '준비 완료';
-        } catch (err) {
-          progress.textContent = `준비 실패: ${err.message || err}`;
-        }
-        e.target.disabled = false;
-        await refresh();
-      } }, '지금 준비하기'));
-  }
-
-  async function settingsPanel() {
+  // ── 도구 (접혀 있음): 오프라인 준비 자세히, 설정, 이미지 출처, M0 측정 ──
+  async function toolsSection() {
     const nPhotos = (await photos.all()).length;
+    const field = (label, control) => h('label', { class: 'field' }, h('span', null, label), control);
     const select = (value, options, onChange) => h('select', { class: 'input', onchange: (e) => onChange(e.target.value) },
       options.map(([v, label]) => h('option', { value: v, selected: v === value }, label)));
-    return section('설정',
-      h('label', { class: 'field-label' }, '모델 조합'),
-      select(settings.preset, Object.keys(PRESETS).map((k) => [k, { q8: 'q8 · WASM', fp16: 'fp16 · WebGPU', mixed: '이미지 fp16·WebGPU + 텍스트 q8' }[k]]), async (v) => {
-        await saveSettings({ preset: v });
-        toast('모델을 다시 불러옵니다');
-        await ml.init(v);
-        ml.load('text').then(() => ml.load('vision')).then(render).catch((err) => toast(`모델 로드 실패: ${err.message || err}`));
-        render();
-      }),
-      h('label', { class: 'field-label' }, '검색 임베딩 위치'),
-      select(settings.searchBackend, [['browser', '이 기기 (브라우저 추론)'], ['server', '서버 (Plan B)']], async (v) => {
-        await saveSettings({ searchBackend: v });
-        logger.log('search_backend_change', null, { value: v });
-        render();
-      }),
-      h('label', { class: 'check' },
-        h('input', { type: 'checkbox', checked: settings.showRaw, onchange: (e) => saveSettings({ showRaw: e.target.checked }) }),
-        h('span', null, '원시 코사인 값도 함께 표시')),
-      h('div', { class: 'row' },
-        h('button', { class: 'btn', type: 'button', onclick: async () => {
-          const n = await exportPhotosZip();
-          toast(n ? `사진 ${n}장을 ZIP으로 저장했어요` : '저장된 사진이 없습니다');
-        } }, `사진 내보내기 (${nPhotos}장)`),
-        h('button', { class: 'btn ghost', type: 'button', onclick: async () => {
-          if (await confirmDialog('기기에 저장된 참여자 사진을 모두 지울까요?', { ok: '지우기', danger: true })) { await photos.clear(); render(); }
-        } }, '사진 지우기')),
-      h('button', { class: 'link-btn', type: 'button', onclick: () => nav.push(sourcesScreen()) }, '이미지 출처 보기'));
-  }
-
-  function demoPanel() {
-    return section('데모 (기록하지 않음)',
-      h('p', { class: 'hint' }, 'Task와 무관하게 각 모듈을 열어 봅니다. 세션이 진행 중일 때는 열 수 없습니다.'),
-      h('div', { class: 'chips' }, Object.entries(MODULE_NAMES).map(([id, name]) => h('button', {
-        class: 'chip', type: 'button',
-        onclick: () => startTask({ task_id: 'demo', moduleId: id, order_index: 0, condition: null, def: { type: 'demo', name } }, { demo: true, onEnd: showConsole }),
-      }, `${id} ${name}`))));
+    const group = (title, ...children) => h('div', { class: 'tool-group' }, h('h4', null, title), children);
+    return h('details', { class: 'tools' },
+      h('summary', null, '도구'),
+      group('오프라인 준비 상태', offlineList, prepareBtn),
+      group('설정',
+        field('모델 조합', select(settings.preset, Object.keys(PRESETS).map((k) => [k, PRESET_LABEL[k] ?? k]), async (v) => {
+          await saveSettings({ preset: v });
+          toast('모델을 다시 불러옵니다');
+          await ml.init(v);
+          updateModelTile();
+          ml.load('text').then(() => ml.load('vision')).catch((err) => toast(`모델 로드 실패: ${err.message || err}`));
+        })),
+        SERVER_API_BASE || settings.searchBackend === 'server' ? field('검색 임베딩 위치', select(settings.searchBackend, [['browser', '이 기기'], ['server', '서버 (Plan B)']], async (v) => {
+          await saveSettings({ searchBackend: v });
+          logger.log('search_backend_change', null, { value: v });
+        })) : null,
+        h('label', { class: 'check compact' },
+          h('input', { type: 'checkbox', checked: settings.showRaw, onchange: (e) => saveSettings({ showRaw: e.target.checked }) }),
+          h('span', null, '유사도 배지에 원시 코사인 값도 표시'))),
+      PHOTO_SOURCE !== 'virtual' || nPhotos ? group('참여자 사진',
+        h('div', { class: 'row' },
+          h('button', { class: 'btn small', type: 'button', onclick: async () => {
+            const n = await exportPhotosZip();
+            toast(n ? `사진 ${n}장을 ZIP으로 저장했어요` : '저장된 사진이 없습니다');
+          } }, `내보내기 (${nPhotos}장)`),
+          h('button', { class: 'btn small ghost', type: 'button', onclick: async () => {
+            if (await confirmDialog('기기에 저장된 참여자 사진을 모두 지울까요?', { ok: '지우기', danger: true })) { await photos.clear(); render(); }
+          } }, '모두 지우기'))) : null,
+      group('그 밖에',
+        h('div', { class: 'link-list' },
+          h('button', { class: 'link-btn', type: 'button', onclick: () => nav.push(sourcesScreen()) }, '이미지 출처 보기'),
+          h('a', { class: 'link-btn', href: url('m0/') }, 'M0 측정 페이지 열기'))));
   }
 
   async function render() {
     if (!alive) return;
     const s = logger.session;
-    status.textContent = statusLine();
+    const ended = (await sessions.all()).filter((x) => x.status !== 'active');
+    const unsaved = ended.filter((x) => !x.exported_at).length;
+    pendingTile.set(`${ended.length}건`, unsaved ? 'warn' : 'ok', ended.length ? (unsaved ? `${unsaved}건 파일 저장 안 함` : '모두 파일로 저장함') : '없음');
     const parts = [
-      h('header', { class: 'console-head' },
-        h('h1', null, `${SERVICE_NAME} 연구자 콘솔`),
-        h('small', null, `v${APP_VERSION} · 데이터 ${db.manifest?.data_version ?? '-'} · 게시물 ${db.posts.length}개`),
-        status),
-      s ? activeSessionPanel(s) : await newSessionPanel(),
-      await pendingPanel(),
-      await offlinePanel(),
-      await settingsPanel(),
-      s ? null : demoPanel(),
+      h('header', { class: 'console-top' },
+        h('div', { class: 'brand' },
+          h('img', { src: url('icons/icon.svg'), alt: '' }),
+          h('div', null, h('strong', null, SERVICE_NAME), h('small', null, '연구자 콘솔'))),
+        onlinePill),
+      h('div', { class: 'tiles' }, modelTile.node, offlineTile.node, pendingTile.node),
+      s ? activeSessionCard(s) : await newSessionCard(),
+      await pendingSection(ended),
+      await toolsSection(),
+      h('footer', { class: 'console-foot' }, `v${APP_VERSION} · 데이터 ${db.manifest?.data_version ?? '-'} · 게시물 ${db.posts.length}개`),
     ];
-    if (alive) el.replaceChildren(...parts.filter(Boolean));
+    if (!alive) return;
+    el.replaceChildren(...parts.filter(Boolean));
+    updateModelTile();
+    updateOnline();
+    updateOfflineTile();
   }
 
-  // 모델 상태가 바뀌면 상태 줄만 고친다. 화면 전체를 다시 그리면 입력 중이던 값이 지워진다
   const unsubscribe = ml.onChange((e) => {
-    if (e.type !== 'ready' && e.type !== 'error') return;
-    status.textContent = statusLine();
-    refreshOffline?.();
+    if (e.type === 'progress') {
+      download = { which: e.which, percent: e.total ? Math.round((e.loaded / e.total) * 100) : 0 };
+      if (download.percent >= 100) download = null;
+    } else if (e.type === 'ready' || e.type === 'error') {
+      download = null;
+      updateOfflineTile();
+    }
+    updateModelTile();
   });
-  const onOnline = () => { status.textContent = statusLine(); };
-  window.addEventListener('online', onOnline);
-  window.addEventListener('offline', onOnline);
+  window.addEventListener('online', updateOnline);
+  window.addEventListener('offline', updateOnline);
   return {
     id: 'console', el, onShow: render,
-    onDestroy: () => { alive = false; unsubscribe(); window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOnline); },
+    onDestroy: () => { alive = false; unsubscribe(); window.removeEventListener('online', updateOnline); window.removeEventListener('offline', updateOnline); },
   };
 }
