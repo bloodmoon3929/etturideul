@@ -1,0 +1,17 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+
+# 수집한 사진 원본과 변환한 모델은 용량이 커서 올리지 않는다(스크립트로 다시 만들 수 있다)
+data/images/
+data/review_embeddings.npz
+models/
+
+# 인터뷰 원본 기록(참여자 데이터)
+reports/data/
+sessions/
+
+# 외부 라이브러리는 scripts/fetch_vendor.py로 받는다 (배포 때는 GitHub Actions가 받는다)
+web/vendor/*
+!web/vendor/README.md

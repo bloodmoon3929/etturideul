@@ -1,0 +1,177 @@
+{
+  "model_variant": "q8",
+  "tiers": {
+    "same": 0.9,
+    "similar": 0.65
+  },
+  "curves": {
+    "post": {
+      "knots": [
+        [
+          0.6,
+          0.0
+        ],
+        [
+          0.8467,
+          0.65
+        ],
+        [
+          0.9417,
+          0.9
+        ],
+        [
+          0.9624,
+          1.0
+        ]
+      ],
+      "n": {
+        "same": 46,
+        "series": 664,
+        "other": 8602
+      },
+      "median": {
+        "same": 0.8958,
+        "series": 0.8575,
+        "other": 0.7176
+      },
+      "same": {
+        "threshold": 0.9417,
+        "precision": 0.417,
+        "recall": 0.217,
+        "f1": 0.286
+      },
+      "similar": {
+        "threshold": 0.8467,
+        "precision": 0.794,
+        "recall": 0.575,
+        "f1": 0.667
+      }
+    },
+    "text": {
+      "knots": [
+        [
+          0.5233,
+          0.0
+        ],
+        [
+          0.6445,
+          0.65
+        ],
+        [
+          0.6691,
+          0.9
+        ],
+        [
+          0.6813,
+          1.0
+        ]
+      ],
+      "n": {
+        "same": 143,
+        "series": 1167,
+        "other": 15471
+      },
+      "median": {
+        "same": 0.6482,
+        "series": 0.6371,
+        "other": 0.6199
+      },
+      "same": {
+        "threshold": 0.6691,
+        "precision": 0.279,
+        "recall": 0.084,
+        "f1": 0.129
+      },
+      "similar": {
+        "threshold": 0.6445,
+        "precision": 0.207,
+        "recall": 0.385,
+        "f1": 0.269
+      }
+    },
+    "image": {
+      "knots": [
+        [
+          0.3969,
+          0.0
+        ],
+        [
+          0.6953,
+          0.65
+        ],
+        [
+          0.8154,
+          0.9
+        ],
+        [
+          0.8361,
+          1.0
+        ]
+      ],
+      "n": {
+        "same": 46,
+        "series": 664,
+        "other": 8602
+      },
+      "median": {
+        "same": 0.7461,
+        "series": 0.7179,
+        "other": 0.5445
+      },
+      "same": {
+        "threshold": 0.8154,
+        "precision": 0.417,
+        "recall": 0.217,
+        "f1": 0.286
+      },
+      "similar": {
+        "threshold": 0.6953,
+        "precision": 0.707,
+        "recall": 0.604,
+        "f1": 0.651
+      }
+    },
+    "image_text": {
+      "knots": [
+        [
+          0.5917,
+          0.0
+        ],
+        [
+          0.8351,
+          0.65
+        ],
+        [
+          0.9305,
+          0.9
+        ],
+        [
+          0.9526,
+          1.0
+        ]
+      ],
+      "n": {
+        "same": 46,
+        "series": 664,
+        "other": 8602
+      },
+      "median": {
+        "same": 0.8871,
+        "series": 0.8565,
+        "other": 0.7194
+      },
+      "same": {
+        "threshold": 0.9305,
+        "precision": 0.234,
+        "recall": 0.239,
+        "f1": 0.237
+      },
+      "similar": {
+        "threshold": 0.8351,
+        "precision": 0.682,
+        "recall": 0.628,
+        "f1": 0.654
+      }
+    }
+  }
+}

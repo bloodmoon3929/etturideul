@@ -1,0 +1,87 @@
+# 사진 수집 검색어 (PLAN 4.3.1)
+# category : 검수 화면에 미리 채워 둘 카테고리 (검수자가 바꿀 수 있음)
+# series   : 시리즈 힌트 (검수자가 확정)
+# group    : 같은 상품 그룹(product_key) 후보 힌트. 서로 다른 사람이 찍은 같은 상품 사진을 모으기 위한 것
+# pages    : 가져올 페이지 수 (Openverse 익명 한도: 분당 20회, 하루 200회, 페이지당 20장)
+defaults:
+  pages: 1
+  page_size: 20
+
+queries:
+  # ── 피규어 ─────────────────────────────────────────
+  - {q: "nendoroid hatsune miku", category: 피규어, series: 보컬로이드, group: nendo-miku}
+  - {q: "nendoroid saber", category: 피규어, series: Fate, group: nendo-saber}
+  - {q: "nendoroid", category: 피규어, pages: 2}
+  - {q: "figma hatsune miku", category: 피규어, series: 보컬로이드, group: figma-miku}
+  - {q: "figma saber", category: 피규어, series: Fate, group: figma-saber}
+  - {q: "figma figure", category: 피규어}
+  - {q: "revoltech danboard", category: 피규어, series: 요츠바랑!, group: revoltech-danboard}
+  - {q: "danbo amazon figure", category: 피규어, series: 요츠바랑!, group: revoltech-danboard}
+  - {q: "scale figure anime", category: 피규어}
+  - {q: "s.h.figuarts goku", category: 피규어, series: 드래곤볼, group: shf-goku}
+  - {q: "dragon ball figure", category: 피규어, series: 드래곤볼}
+  - {q: "one piece luffy figure", category: 피규어, series: 원피스, group: luffy-figure}
+  - {q: "evangelion unit 01 figure", category: 피규어, series: 에반게리온, group: eva01-figure}
+  - {q: "rei ayanami figure", category: 피규어, series: 에반게리온, group: rei-figure}
+  - {q: "totoro figure", category: 피규어, series: 이웃집 토토로}
+  - {q: "pikachu figure", category: 피규어, series: 포켓몬스터}
+  - {q: "sailor moon figure", category: 피규어, series: 세일러문}
+
+  # ── 프라모델 ───────────────────────────────────────
+  - {q: "gunpla rx-78-2", category: 프라모델, series: 건담, group: gunpla-rx78}
+  - {q: "gunpla zaku", category: 프라모델, series: 건담, group: gunpla-zaku}
+  - {q: "gunpla unicorn gundam", category: 프라모델, series: 건담, group: gunpla-unicorn}
+  - {q: "gunpla", category: 프라모델, series: 건담, pages: 2}
+  - {q: "HG gundam model", category: 프라모델, series: 건담}
+  - {q: "SD gundam model kit", category: 프라모델, series: 건담}
+  - {q: "gundam model kit box", category: 프라모델, series: 건담}
+  - {q: "evangelion model kit", category: 프라모델, series: 에반게리온}
+
+  # ── 아크릴 스탠드 ──────────────────────────────────
+  - {q: "acrylic stand anime", category: 아크릴 스탠드}
+  - {q: "acrylic standee character", category: 아크릴 스탠드}
+  - {q: "acrylic keychain anime", category: 아크릴 스탠드}
+  - {q: "anime standee", category: 아크릴 스탠드}
+
+  # ── 랜덤 굿즈/뱃지 ─────────────────────────────────
+  - {q: "can badge anime", category: 랜덤 굿즈/뱃지}
+  - {q: "anime pin badge", category: 랜덤 굿즈/뱃지}
+  - {q: "blind box figure", category: 랜덤 굿즈/뱃지}
+  - {q: "gashapon capsule toy", category: 랜덤 굿즈/뱃지}
+  - {q: "sonny angel", category: 랜덤 굿즈/뱃지, series: 소니엔젤, group: sonny-angel}
+  - {q: "bearbrick", category: 랜덤 굿즈/뱃지, series: 베어브릭, group: bearbrick}
+  - {q: "ichiban kuji", category: 랜덤 굿즈/뱃지}
+  - {q: "anime keychain", category: 랜덤 굿즈/뱃지}
+
+  # ── 인형 ───────────────────────────────────────────
+  - {q: "totoro plush", category: 인형, series: 이웃집 토토로, group: totoro-plush}
+  - {q: "pikachu plush", category: 인형, series: 포켓몬스터, group: pikachu-plush}
+  - {q: "snorlax plush", category: 인형, series: 포켓몬스터, group: snorlax-plush}
+  - {q: "eevee plush", category: 인형, series: 포켓몬스터, group: eevee-plush}
+  - {q: "kirby plush", category: 인형, series: 별의 커비, group: kirby-plush}
+  - {q: "rilakkuma plush", category: 인형, series: 리락쿠마, group: rilakkuma-plush}
+  - {q: "hello kitty plush", category: 인형, series: 산리오, group: hellokitty-plush}
+  - {q: "anime plush doll", category: 인형}
+
+# ── 가상 갤러리용 일상 사진 (scripts/make_gallery.py) ─────────────────
+# 과업에서 "사진으로 찾기"를 할 때 폰 갤러리처럼 보이는 화면에 깔아 두는 사진이다.
+# 과업 대상 사진이 이 사진들보다 앞(가장 최근)에 놓인다. 사람이 나오지 않는 사진만 쓴다.
+# 라이선스는 CC0 / Public Domain만 받는다. skip에 Openverse id를 적으면 그 사진은 건너뛴다.
+gallery:
+  queries:
+    - "latte coffee cup"
+    - "sunset sky clouds"
+    - "cat sleeping"
+    - "ramen bowl"
+    - "city street night lights"
+    - "laptop desk workspace"
+    - "flowers bouquet"
+    - "mountain lake landscape"
+    - "dog on grass"
+    - "bookshelf books"
+    - "bicycle parked"
+    - "beach waves"
+  skip: []
+  # 대상 사진만 굿즈라 티가 나지 않도록 섞어 두는 다른 굿즈 사진(data/images의 id).
+  # 게시물로 쓰지 않은 사진 중 얼굴·워터마크가 없고 Task 대상(세이버, 단보)과 다른 시리즈만 골랐다.
+  goods: [img_0361, img_0176, img_0303, img_0341, img_0414, img_0200]

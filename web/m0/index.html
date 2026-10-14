@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>에뚜리들 M0 측정</title>
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<style>
+  :root { color-scheme: light; --ink:#2b2622; --sub:#6f665e; --line:#e4dcd2; --bg:#faf6f0; --card:#fff; --accent:#d9582b; --ok:#2e7d4f; --bad:#b3261e; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px 16px 48px; font:16px/1.5 system-ui, "Noto Sans KR", sans-serif; color:var(--ink); background:var(--bg); }
+  h1 { font-size:20px; margin:0 0 4px; }
+  h2 { font-size:16px; margin:24px 0 8px; }
+  p { margin:4px 0; color:var(--sub); font-size:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin-top:8px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  button { min-height:44px; padding:0 14px; border-radius:10px; border:1px solid var(--line); background:#fff; font:inherit; color:var(--ink); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  button:disabled { opacity:.45; }
+  label.opt { display:flex; align-items:center; gap:6px; min-height:44px; padding:0 12px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .ok { color:var(--ok); font-weight:600; } .bad { color:var(--bad); font-weight:600; }
+  #log { font:12px/1.5 ui-monospace, monospace; white-space:pre-wrap; max-height:220px; overflow:auto; color:var(--sub); }
+  progress { width:100%; height:8px; }
+</style>
+</head>
+<body>
+<h1>M0 브라우저 추론 측정</h1>
+<p>이 페이지를 연구자 폰의 Chrome에서 열고, 조합별로 [측정 시작]을 누른 뒤 맨 아래 [결과 저장]으로 JSON을 보내 주세요.</p>
+
+<h2>1. 기기</h2>
+<div class="card scroll"><table id="device"></table></div>
+
+<h2>2. 측정</h2>
+<div class="card">
+  <div class="row" id="presets">
+    <label class="opt"><input type="radio" name="preset" value="q8" checked> q8 · WASM</label>
+    <label class="opt"><input type="radio" name="preset" value="mixed"> 이미지 fp16 · WebGPU + 텍스트 q8</label>
+    <label class="opt"><input type="radio" name="preset" value="fp16"> fp16 · WebGPU</label>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button class="primary" id="run">측정 시작</button>
+    <button id="stability">안정성 테스트 (10분)</button>
+    <button id="reload">캐시 상태로 다시 측정(새로고침)</button>
+  </div>
+  <p id="status" style="margin-top:8px">대기 중</p>
+  <progress id="bar" value="0" max="1" hidden></progress>
+</div>
+
+<h2>3. 결과</h2>
+<div class="card scroll"><table id="results"></table></div>
+<div class="row" style="margin-top:8px">
+  <button id="save">결과 저장 (JSON 파일)</button>
+  <button id="copy">결과 복사</button>
+  <button id="clear">기록 지우기</button>
+</div>
+
+<h2>4. 오프라인 확인</h2>
+<p>위 측정을 한 번 끝낸 뒤 비행기 모드를 켜고 이 페이지를 새로고침해서 [측정 시작]이 되는지 봅니다. 되면 결과 표의 "오프라인" 칸이 "예"로 기록됩니다.</p>
+
+<h2>로그</h2>
+<div class="card" id="log"></div>
+
+<script type="module" src="./m0.js"></script>
+</body>
+</html>

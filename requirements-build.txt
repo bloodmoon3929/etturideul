@@ -1,0 +1,21 @@
+# 워크스테이션 오프라인 파이프라인 전용 (휴대폰·배포에는 필요 없음)
+torch
+sentence-transformers
+transformers
+tokenizers
+onnx
+onnxruntime
+onnxconverter-common
+onnxscript
+numpy
+pillow
+scikit-learn        # HDBSCAN은 scikit-learn 내장 구현(sklearn.cluster.HDBSCAN)을 쓴다
+umap-learn
+requests
+pyyaml
+matplotlib
+pandas
+openpyxl
+qrcode
+reportlab
+playwright          # 로컬 브라우저 자동 점검용(설치된 Chrome 사용, 브라우저 다운로드 없음)

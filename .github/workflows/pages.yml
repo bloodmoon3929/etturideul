@@ -1,0 +1,36 @@
+# web/ 디렉터리를 GitHub Pages에 배포한다.
+# 저장소 Settings → Pages → Build and deployment → Source를 "GitHub Actions"로 바꿔 두어야 한다.
+# 모델 파일(models/)은 GitHub에 올릴 수 없는 크기라 저장소에 없다. 배포한 앱은 web/js/config.js의 MODEL_SOURCE에서 모델을 받는다.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'scripts/fetch_vendor.py', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      # 외부 라이브러리는 저장소에 없다. 버전·SHA-256을 고정한 주소에서 받는다
+      - run: python3 scripts/fetch_vendor.py
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v5

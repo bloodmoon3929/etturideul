@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>에뚜리들 연구자 대시보드</title>
+</head>
+<body style="font:16px/1.6 system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px;color:#2b2622">
+<h1 style="font-size:20px">연구자 대시보드 (준비 중)</h1>
+<p>이 화면은 Firebase 연동 후에 만든다. 그때까지 세션 기록은 앱의 연구자 콘솔에서 [JSON 파일로 저장]으로 꺼내고,
+분석은 <code>scripts/analyze_logs.py</code>로 한다.</p>
+<!--
+  TODO(firebase): 연구자 대시보드 (PLAN 14.7). Google 서비스에 접속할 수 있는 환경에서 구현한다.
+
+  - 접근: Firebase Authentication의 Google 로그인. 허용한 연구자 UID만 Firestore를 읽을 수 있다(firestore.rules).
+  - 세션 목록: sessions 컬렉션 조회 (참여자, 순서 그룹, 날짜, 총 시간, 이벤트 수)
+  - 세션 타임라인: sessions/{id}/events 청크를 합쳐 과업 구간을 색으로 구분하고 관찰 메모를 함께 표시
+  - 리플레이: sessions/{id}/replay 청크를 rrweb-player로 재생, t_session_ms로 이벤트와 시간 맞춤
+  - 요약 표: 과업·조건별 성공률·소요 시간·SEQ (PLAN 14.6.3의 task_runs, paired)
+  - 내보내기: 세션 묶음 JSON, 분석용 CSV 전체(ZIP), jev_input.csv
+-->
+</body>
+</html>
